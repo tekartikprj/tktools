@@ -9,7 +9,7 @@ environment:
 # Add regular dependencies here.
 dependencies:
   args: '>=2.5.0'
-  collection: ^1.19.0
+  collection: '>=1.18.0' # not 1.19.0 as flutter 3.22 pins on 1.18
   cv: '>=0.2.20+1'
   dev_build: '>=1.0.0+8'
   path: '>=1.9.0'
