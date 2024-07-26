@@ -5,6 +5,7 @@ import 'package:process_run/shell.dart';
 import 'package:process_run/stdio.dart';
 // ignore: implementation_imports
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub_package_info.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
@@ -65,7 +66,14 @@ class TkpubAddCommand extends TkpubAddRemoveCommand {
 
   /// Pub add
   TkpubAddCommand()
-      : super(name: 'add', parser: ArgParser(allowTrailingOptions: true)) {
+      : super(
+            name: 'add',
+            parser: ArgParser(allowTrailingOptions: true),
+            description: '''
+tkpub add [dev:|override:|pubspec_overrides:]package1 [package2]
+
+Add package using user env config
+      ''') {
     parser.addFlag(flagDevKey, help: 'Add to dev_dependencies mode');
     parser.addFlag(flagOverridesKey, help: 'Add to dependecy_overrides');
     parser.addFlag(flagForceKey,
@@ -89,17 +97,17 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
   bool get isClear => false;
 
   /// Add/remove
-  TkpubAddRemoveCommand({required super.name, super.parser});
+  TkpubAddRemoveCommand({required super.name, super.parser, super.description});
   @override
   FutureOr<bool> onRun() async {
-    var dev = !isClear ? results.flag(flagDevKey) : false;
-    var overrides = !isClear ? results.flag(flagOverridesKey) : false;
-    var pubspecOverrides = results.flag(flagPubspecOverridesKey);
+    var globalDev = !isClear ? results.flag(flagDevKey) : false;
+    var globalOverrides = !isClear ? results.flag(flagOverridesKey) : false;
+    var globalPubspecOverrides = results.flag(flagPubspecOverridesKey);
     var recursive = results.flag(flagRecursiveKey);
     var force = isAdd ? results.flag(flagForceKey) : false;
 
-    if (pubspecOverrides) {
-      if (dev || overrides) {
+    if (globalOverrides) {
+      if (globalOverrides || globalOverrides) {
         throw ArgumentError(
             'Cannot use --$flagPubspecOverridesKey with --$flagDevKey or --$flagOverridesKey');
       }
@@ -109,8 +117,9 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
     if (isClear && rest.isNotEmpty) {
       throw ArgumentError('No argument expected for clear');
     }
-    if (!isClear && rest.length != 1) {
-      throw ArgumentError('One argument expected (package name)');
+    if (!isClear && rest.isEmpty) {
+      throw ArgumentError(
+          'At least one argument expected (package name with optional target and dev)');
     }
     var verbose = this.verbose ?? false;
 
@@ -132,7 +141,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
       final topPath = '.';
 
       if (isClear) {
-        if (pubspecOverrides) {
+        if (globalPubspecOverrides) {
           Future<void> handlePath(String path) async {
             stdout.writeln('# ${relative(path, from: topPath)}');
             var pubspecOverrideFile =
@@ -148,201 +157,206 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
           stderr.writeln('Must specify --pubspec-overrides');
         }
       } else {
-        var packageNameOrDef = rest.first.trim();
-        if (packageNameOrDef.startsWith("'") &&
-            packageNameOrDef.endsWith("'")) {
-          packageNameOrDef =
-              packageNameOrDef.substring(1, packageNameOrDef.length - 1);
-        }
-        var packageName = packageNameOrDef.split(':').first;
-        // True for add only!
-        //var packageHasDefinition = packageName != packageNameOrDef;
-        var package = await db.getPackageOrNull(packageName);
+        for (var arg in rest) {
+          var info = TkpubPackageInfo.parse(arg);
+          var packageName = info.name;
+          // True for add only!
+          //var packageHasDefinition = packageName != packageNameOrDef;
+          var package = await db.getPackageOrNull(packageName);
 
-        if (pubspecOverrides) {
-          var dependencies = [packageName];
+          var pubspecOverrides = info.target == TkpubTarget.pubspecOverrides ||
+              (info.target == null && globalPubspecOverrides);
+          if (pubspecOverrides) {
+            var dependencies = [packageName];
 
-          /// Find all local project in git
-          var gitTopLevelPath = await findGitTopLevelPath(topPath);
-          var allPackageWithDependency = <String>{};
-          if (gitTopLevelPath != null) {
-            var pathsHandled = <String>{};
-            while (true) {
-              var allPaths = await recursivePubPath([gitTopLevelPath],
-                  dependencies: dependencies);
+            /// Find all local project in git
+            var gitTopLevelPath = await findGitTopLevelPath(topPath);
+            var allPackageWithDependency = <String>{};
+            if (gitTopLevelPath != null) {
+              var pathsHandled = <String>{};
+              while (true) {
+                var allPaths = await recursivePubPath([gitTopLevelPath],
+                    dependencies: dependencies);
 
-              var newAll = allPackageWithDependency.toSet();
-              for (var path in allPaths) {
-                if (pathsHandled.contains(path)) {
-                  continue;
-                } else {
-                  pathsHandled.add(path);
+                var newAll = allPackageWithDependency.toSet();
+                for (var path in allPaths) {
+                  if (pathsHandled.contains(path)) {
+                    continue;
+                  } else {
+                    pathsHandled.add(path);
+                  }
+                  var subPubspec = await pathGetPubspecYamlMap(path);
+                  var packageName = pubspecYamlGetPackageName(subPubspec)!;
+                  newAll.add(packageName);
+                  dependencies =
+                      (dependencies.toSet()..add(packageName)).toList();
                 }
-                var subPubspec = await pathGetPubspecYamlMap(path);
-                var packageName = pubspecYamlGetPackageName(subPubspec)!;
-                newAll.add(packageName);
-                dependencies =
-                    (dependencies.toSet()..add(packageName)).toList();
+                if (newAll.length == allPackageWithDependency.length) {
+                  break;
+                }
+                allPackageWithDependency = newAll;
               }
-              if (newAll.length == allPackageWithDependency.length) {
-                break;
-              }
-              allPackageWithDependency = newAll;
-            }
-            if (verbose) {
-              stdout.writeln(
-                  'allPackageWithDependency: $allPackageWithDependency');
-            }
-          }
-
-          Future<void> handlePath(String path) async {
-            stdout.writeln('# ${relative(path, from: topPath)}');
-            var localPubspecMap = await pathGetPubspecYamlMap(path);
-            var isFlutterPackage = pubspecYamlSupportsFlutter(localPubspecMap);
-            var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
-            var localPackageName = pubspecYamlGetPackageName(localPubspecMap)!;
-            var hasDependency =
-                allPackageWithDependency.contains(localPackageName);
-            if (!hasDependency) {
               if (verbose) {
-                stdout.writeln('$packageName not a dependency');
+                stdout.writeln(
+                    'allPackageWithDependency: $allPackageWithDependency');
               }
-              return;
             }
-            var inlineOverrides = localPubspecMap['dependency_overrides']
-                ?.anyAs<Map?>()
-                ?.deepClone();
-            // devPrint('inlineOverrides: $inlineOverrides');
-            var pubspecOverrideFile =
-                File(join(path, 'pubspec_overrides.yaml'));
-            var pubspecOverridesMap = Model();
-            try {
-              var existingText = await pubspecOverrideFile.readAsString();
-              pubspecOverridesMap =
-                  (loadYaml(existingText) as Object).anyAs<Map>().deepClone();
-            } catch (_) {}
 
-            var githubTop = normalize(absolute(findGithubTop(path)));
-            var existing = pubspecOverridesMap['dependency_overrides']
-                ?.anyAs<Map?>()
-                ?.deepClone();
-
-            var overrides = newModel();
-            // Add inline (in pubspec.yaml) first.
-            if (inlineOverrides != null) {
-              overrides.addAll(inlineOverrides);
-            }
-            // Override with existing.
-            if (existing != null) {
-              overrides.addAll(existing);
-            }
-            pubspecOverridesMap['dependency_overrides'] = overrides;
-
-            if (isRemove) {
-              if (overrides.containsKey(packageName)) {
-                // if (verbose) {
-                var existingPackage = overrides[packageName];
-                stdout.writeln('removing $packageName (was $existingPackage)');
-                overrides.remove(packageName);
-                // }
-              } else {
+            Future<void> handlePath(String path) async {
+              stdout.writeln('# ${relative(path, from: topPath)}');
+              var localPubspecMap = await pathGetPubspecYamlMap(path);
+              var isFlutterPackage =
+                  pubspecYamlSupportsFlutter(localPubspecMap);
+              var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
+              var localPackageName =
+                  pubspecYamlGetPackageName(localPubspecMap)!;
+              var hasDependency =
+                  allPackageWithDependency.contains(localPackageName);
+              if (!hasDependency) {
                 if (verbose) {
-                  stdout.writeln('$packageName not found in overrides');
+                  stdout.writeln('$packageName not a dependency');
                 }
                 return;
               }
-            } else if (package == null) {
-              var parts = packageNameOrDef.split(':');
-              if (parts.length == 1) {
-                throw StateError('Package not found $packageName');
+              var inlineOverrides = localPubspecMap['dependency_overrides']
+                  ?.anyAs<Map?>()
+                  ?.deepClone();
+              // devPrint('inlineOverrides: $inlineOverrides');
+              var pubspecOverrideFile =
+                  File(join(path, 'pubspec_overrides.yaml'));
+              var pubspecOverridesMap = Model();
+              try {
+                var existingText = await pubspecOverrideFile.readAsString();
+                pubspecOverridesMap =
+                    (loadYaml(existingText) as Object).anyAs<Map>().deepClone();
+              } catch (_) {}
+
+              var githubTop = normalize(absolute(findGithubTop(path)));
+              var existing = pubspecOverridesMap['dependency_overrides']
+                  ?.anyAs<Map?>()
+                  ?.deepClone();
+
+              var overrides = newModel();
+              // Add inline (in pubspec.yaml) first.
+              if (inlineOverrides != null) {
+                overrides.addAll(inlineOverrides);
               }
-              if (hasDependency) {
-                var def = packageNameOrDef.substring(parts[0].length + 1);
-                overrides[packageName] = jsonDecode(def);
-
-                stdout.writeln('Adding $packageName: def: $def');
+              // Override with existing.
+              if (existing != null) {
+                overrides.addAll(existing);
               }
-            } else {
-              var dependencyGithubPath = Uri.parse(package.gitUrl.v!).path;
-              if (dependencyGithubPath.endsWith('.git')) {
-                dependencyGithubPath = dependencyGithubPath.substring(
-                    0, dependencyGithubPath.length - '.git'.length);
-              }
-              if (dependencyGithubPath.startsWith('/')) {
-                dependencyGithubPath = dependencyGithubPath.substring(1);
-              }
-              var gitPath = package.gitPath.v?.trim();
-              var dependencyPath = normalize(absolute(joinAll([
-                githubTop,
-                dependencyGithubPath,
-                if (gitPath?.isNotEmpty ?? false) gitPath!
-              ])));
-              var relativePath = relative(dependencyPath, from: path);
+              pubspecOverridesMap['dependency_overrides'] = overrides;
 
-              if (hasDependency) {
-                overrides[package.id] = {
-                  'path': relativePath,
-                };
-                stdout.writeln('Adding $packageName: path: $relativePath');
-              }
-            }
-
-            if (overrides.isNotEmpty) {
-              var lines = pubspecOverridesMap.toYamlStrings('');
-              var txt = '${lines.join('\n')}\n';
-              await pubspecOverrideFile.writeAsString(txt);
-            } else {
-              await pubspecOverrideFile.delete(recursive: true);
-            }
-            var shell = Shell().cd(path);
-            await shell.run('$dartOrFlutter pub get');
-          }
-
-          await handleTopPath(topPath, handlePath);
-
-          //throw UnsupportedError('--$flagPubspcOverridesKey not implemented yet');
-          return;
-        } else {
-          Future<void> handlePath(String path) async {
-            stdout.writeln('# ${relative(path, from: topPath)}');
-            var pubspecMap = await pathGetPubspecYamlMap('.');
-            var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
-            var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
-
-            var shell = Shell(workingDirectory: topPath);
-
-            var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');
-            if (isRemove) {
-              await shell.run('$dartOrFlutter pub remove $prefix'
-                  '$packageName');
-            } else {
-              if (package == null) {
-                if (!force) {
+              if (isRemove) {
+                if (overrides.containsKey(packageName)) {
+                  // if (verbose) {
+                  var existingPackage = overrides[packageName];
+                  stdout
+                      .writeln('removing $packageName (was $existingPackage)');
+                  overrides.remove(packageName);
+                  // }
+                } else {
+                  if (verbose) {
+                    stdout.writeln('$packageName not found in overrides');
+                  }
+                  return;
+                }
+              } else if (package == null) {
+                if (info.def == null) {
                   throw StateError('Package not found $packageName');
                 }
-                await shell
-                    .run('$dartOrFlutter pub add ${shellArgument('$prefix'
-                            '$packageName')}'
-                        ' --directory .');
+                if (hasDependency) {
+                  overrides[packageName] = info.def;
+
+                  stdout.writeln('Adding $packageName: def: ${info.def}');
+                }
               } else {
-                await shell
-                    .run('$dartOrFlutter pub add ${shellArgument('$prefix'
-                            '$packageName:'
-                            '${jsonEncode({
-                      if (package.gitUrl.isNotNull)
-                        'git': {
-                          'url': package.gitUrl.v,
-                          if (package.gitPath.isNotNull)
-                            'path': package.gitPath.v,
-                          if (package.gitRef.isNotNull) 'ref': package.gitRef.v,
-                        },
-                    })}')}'
-                        ' --directory .');
+                var dependencyGithubPath = Uri.parse(package.gitUrl.v!).path;
+                if (dependencyGithubPath.endsWith('.git')) {
+                  dependencyGithubPath = dependencyGithubPath.substring(
+                      0, dependencyGithubPath.length - '.git'.length);
+                }
+                if (dependencyGithubPath.startsWith('/')) {
+                  dependencyGithubPath = dependencyGithubPath.substring(1);
+                }
+                var gitPath = package.gitPath.v?.trim();
+                var dependencyPath = normalize(absolute(joinAll([
+                  githubTop,
+                  dependencyGithubPath,
+                  if (gitPath?.isNotEmpty ?? false) gitPath!
+                ])));
+                var relativePath = relative(dependencyPath, from: path);
+
+                if (hasDependency) {
+                  overrides[package.id] = {
+                    'path': relativePath,
+                  };
+                  stdout.writeln('Adding $packageName: path: $relativePath');
+                }
+              }
+
+              if (overrides.isNotEmpty) {
+                var lines = pubspecOverridesMap.toYamlStrings('');
+                var txt = '${lines.join('\n')}\n';
+                await pubspecOverrideFile.writeAsString(txt);
+              } else {
+                await pubspecOverrideFile.delete(recursive: true);
+              }
+              var shell = Shell().cd(path);
+              await shell.run('$dartOrFlutter pub get');
+            }
+
+            await handleTopPath(topPath, handlePath);
+
+            //throw UnsupportedError('--$flagPubspcOverridesKey not implemented yet');
+            return;
+          } else {
+            Future<void> handlePath(String path) async {
+              stdout.writeln('# ${relative(path, from: topPath)}');
+              var pubspecMap = await pathGetPubspecYamlMap('.');
+              var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
+              var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
+
+              var shell = Shell(workingDirectory: topPath);
+              var dev = info.target == TkpubTarget.dev ||
+                  (info.target == null && globalDev);
+              var overrides = info.target == TkpubTarget.override ||
+                  (info.target == null && globalPubspecOverrides);
+
+              var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');
+              if (isRemove) {
+                await shell.run('$dartOrFlutter pub remove $prefix'
+                    '$packageName');
+              } else {
+                if (package == null) {
+                  if (!force) {
+                    throw StateError('Package not found $packageName');
+                  }
+                  await shell
+                      .run('$dartOrFlutter pub add ${shellArgument('$prefix'
+                              '$packageName')}'
+                          ' --directory .');
+                } else {
+                  await shell
+                      .run('$dartOrFlutter pub add ${shellArgument('$prefix'
+                              '$packageName:'
+                              '${jsonEncode({
+                        if (package.gitUrl.isNotNull)
+                          'git': {
+                            'url': package.gitUrl.v,
+                            if (package.gitPath.isNotNull)
+                              'path': package.gitPath.v,
+                            if (package.gitRef.isNotNull)
+                              'ref': package.gitRef.v,
+                          },
+                      })}')}'
+                          ' --directory .');
+                }
               }
             }
-          }
 
-          await handleTopPath(topPath, handlePath);
+            await handleTopPath(topPath, handlePath);
+          }
         }
       }
     });
