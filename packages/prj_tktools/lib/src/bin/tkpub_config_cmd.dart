@@ -1,14 +1,22 @@
 import 'package:args/args.dart';
 // ignore: implementation_imports
 import 'package:process_run/src/mixin/shell_bin.dart';
+import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 
+/// git url option
 const optionGitUrl = 'git-url';
+
+/// git path option
 const optionGitPath = 'git-path';
+
+/// git ref option
 const optionGitRef = 'git-ref';
 
+/// tkpub config
 class TkpubConfigCommand extends ShellBinCommand {
+  /// tkpub config
   TkpubConfigCommand() : super(name: 'config') {
     addCommand(_SetCommand());
     addCommand(_DeleteCommand());
@@ -78,7 +86,7 @@ class _ListCommand extends ShellBinCommand {
     await tkpubDbAction((db) async {
       var packages = await packagesStore.query().getRecords(db.db);
       for (var package in packages) {
-        print(
+        stdout.writeln(
             '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
       }
     });

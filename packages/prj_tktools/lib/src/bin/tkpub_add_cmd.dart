@@ -11,15 +11,27 @@ import 'package:yaml/yaml.dart';
 
 import 'tkpub.dart';
 
+/// Dev flag
 const flagDevKey = 'dev';
+
+/// Force flag
 const flagForceKey = 'force';
+
+/// Overrides flag
 const flagOverridesKey = 'overrides';
+
+/// pub spec overrides
 const flagPubspecOverridesKey = 'pubspec-overrides';
+
+/// Recursive
 const flagRecursiveKey = 'recursive';
 
+/// Clear
 class TkpubClearCommand extends TkpubAddRemoveCommand {
   @override
   bool get isClear => true;
+
+  /// Clear
   TkpubClearCommand()
       : super(name: 'clear', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagPubspecOverridesKey,
@@ -29,9 +41,12 @@ class TkpubClearCommand extends TkpubAddRemoveCommand {
   }
 }
 
+/// Pub remove.
 class TkpubRemoveCommand extends TkpubAddRemoveCommand {
   @override
   bool get isRemove => true;
+
+  /// Pub remove
   TkpubRemoveCommand()
       : super(name: 'remove', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagDevKey, help: 'Remove from dev_dependencies mode');
@@ -43,9 +58,12 @@ class TkpubRemoveCommand extends TkpubAddRemoveCommand {
   }
 }
 
+/// Pub add
 class TkpubAddCommand extends TkpubAddRemoveCommand {
   @override
   bool get isAdd => true;
+
+  /// Pub add
   TkpubAddCommand()
       : super(name: 'add', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagDevKey, help: 'Add to dev_dependencies mode');
@@ -59,10 +77,18 @@ class TkpubAddCommand extends TkpubAddRemoveCommand {
   }
 }
 
+/// Add/remove
 abstract class TkpubAddRemoveCommand extends ShellBinCommand {
+  /// true if is add
   bool get isAdd => false;
+
+  /// true is is remove
   bool get isRemove => false;
+
+  /// true if is clear
   bool get isClear => false;
+
+  /// Add/remove
   TkpubAddRemoveCommand({required super.name, super.parser});
   @override
   FutureOr<bool> onRun() async {
@@ -172,6 +198,8 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
           Future<void> handlePath(String path) async {
             stdout.writeln('# ${relative(path, from: topPath)}');
             var localPubspecMap = await pathGetPubspecYamlMap(path);
+            var isFlutterPackage = pubspecYamlSupportsFlutter(localPubspecMap);
+            var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
             var localPackageName = pubspecYamlGetPackageName(localPubspecMap)!;
             var hasDependency =
                 allPackageWithDependency.contains(localPackageName);
@@ -230,7 +258,6 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
               }
               if (hasDependency) {
                 var def = packageNameOrDef.substring(parts[0].length + 1);
-                print(def);
                 overrides[packageName] = jsonDecode(def);
 
                 stdout.writeln('Adding $packageName: def: $def');
@@ -267,6 +294,8 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
             } else {
               await pubspecOverrideFile.delete(recursive: true);
             }
+            var shell = Shell().cd(path);
+            await shell.run('$dartOrFlutter pub get');
           }
 
           await handleTopPath(topPath, handlePath);
@@ -321,6 +350,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
   }
 }
 
+/// Find tekartik github top
 String findGithubTop(String dirPath) {
   var dir = Directory(normalize(dirPath)).absolute;
   while (dir.path != '/') {
@@ -360,11 +390,4 @@ extension on Map {
     }
     return lines;
   }
-}
-
-String toYamlString(Object value) {
-  if (value is Map) {
-    return 'null';
-  }
-  return jsonEncode(value);
 }

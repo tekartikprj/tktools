@@ -14,8 +14,9 @@ import 'tkpub_add_cmd.dart';
 import 'tkpub_config_cmd.dart';
 
 //late bool verbose;
-
+/// tkpub command
 class TkpubCommand extends ShellBinCommand {
+  /// tkpub command
   TkpubCommand() : super(name: 'tkpub') {
     addCommand(TkpubConfigCommand());
     addCommand(_InitCommand());
@@ -31,6 +32,7 @@ class TkpubCommand extends ShellBinCommand {
   }
 }
 
+/// path prefs key.
 const prefsKeyPath = 'path';
 
 class _InitCommand extends ShellBinCommand {
@@ -63,25 +65,36 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
+/// Db config ref
 class DbConfigRef extends DbStringRecordBase {
+  /// git ref (dart3a)
   final gitRef = CvField<String>('gitRef');
 
   @override
   CvFields get fields => [gitRef];
 }
 
+/// Db package config
 class DbPackage extends DbStringRecordBase {
+  /// url
   final gitUrl = CvField<String>('gitUrl');
+
+  /// path
   final gitPath = CvField<String>('gitPath');
+
+  /// ref (optional, default to config)
   final gitRef = CvField<String>('gitRef');
 
   @override
   CvFields get fields => [gitUrl, gitPath, gitRef];
 }
 
+/// Config database.
 class ConfigDb {
+  /// the sembase db
   final Database db;
 
+  /// Delete a package
   Future<bool> deletePackage(String id) async {
     if (packagesStore.record(id).existsSync(db)) {
       await packagesStore.record(id).delete(db);
@@ -90,10 +103,12 @@ class ConfigDb {
     return false;
   }
 
+  /// set/update a package
   Future<void> setPackage(DbPackage package) async {
     await packagesStore.record(package.id).put(db, package);
   }
 
+  /// Get a package
   Future<DbPackage> getPackage(String id) async {
     var package = await getPackageOrNull(id);
     if (package == null) {
@@ -102,6 +117,7 @@ class ConfigDb {
     return package;
   }
 
+  /// Get a package or null
   Future<DbPackage?> getPackageOrNull(String id) async {
     var package = await packagesStore.record(id).get(db);
     if (package == null) {
@@ -114,22 +130,29 @@ class ConfigDb {
     return package;
   }
 
+  /// Constructor
   ConfigDb(this.db);
 }
 
+/// Open the prefs
 Future<Prefs> openPrefs() async {
   var prefsFactory = getPrefsFactory(packageName: 'com.tekartik.tkpub');
   return await prefsFactory.openPreferences('config.prefs');
 }
 
+/// Package store
 var packagesStore = cvStringRecordFactory.store<DbPackage>('packages');
+
+/// Config store
 var configStore = cvStringRecordFactory.store<DbRecord<String>>('config');
+
+/// Config ref record.
 var configRefRecord = configStore.cast<String, DbConfigRef>().record('ref');
 
 late String _configExportPath;
-var initialized = false;
+var _initialized = false;
 Future<Database> _tkpubDbOpen() async {
-  if (!initialized) {
+  if (!_initialized) {
     var prefs = await openPrefs();
     var prefsPath = prefs.getString(prefsKeyPath);
     if (prefsPath == null) {
@@ -138,7 +161,7 @@ Future<Database> _tkpubDbOpen() async {
       cvAddConstructor(DbPackage.new);
       cvAddConstructor(DbConfigRef.new);
       _configExportPath = prefsPath;
-      initialized = true;
+      _initialized = true;
     }
   }
 
@@ -151,7 +174,7 @@ Future<Database> _tkpubDbOpen() async {
       db = await importDatabaseAny(
           await exportFile.readAsLines(), factory, dbName);
     } catch (e) {
-      print('error: $e');
+      stderr.writeln('error: $e');
     }
   }
   db ??= await factory.openDatabase(dbName);
@@ -165,6 +188,7 @@ Future<void> _tkpubDbClose(Database db) async {
       .writeAsString(exportLinesToJsonlString(await exportDatabaseLines(db)));
 }
 
+/// tkpub action on db, import & export
 Future<void> tkpubDbAction(Future<void> Function(ConfigDb db) action,
     {bool? write}) async {
   var db = await _tkpubDbOpen();
