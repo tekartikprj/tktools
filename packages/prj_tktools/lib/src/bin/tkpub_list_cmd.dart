@@ -51,6 +51,7 @@ class TkpubListCommand extends ShellBinCommand {
         pubspecYamlGetDependenciesPackageName(pubspec, kind: kind);
     packages =
         packages.where((element) => dependencies.contains(element)).toList();
+    packages.sort();
     stdout.writeln('Tkpub $kind packages: ${packages.length}');
     stdout.writeln(packages.join(', '));
     return true;
