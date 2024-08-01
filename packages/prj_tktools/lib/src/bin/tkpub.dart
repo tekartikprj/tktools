@@ -8,6 +8,7 @@ import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_app_sembast/sembast.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub_list_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 
 import 'tkpub_add_cmd.dart';
@@ -22,6 +23,7 @@ class TkpubCommand extends ShellBinCommand {
     addCommand(_InitCommand());
     addCommand(TkpubAddCommand());
     addCommand(TkpubRemoveCommand());
+    addCommand(TkpubListCommand());
     addCommand(TkpubClearCommand());
   }
 
@@ -189,11 +191,11 @@ Future<void> _tkpubDbClose(Database db) async {
 }
 
 /// tkpub action on db, import & export
-Future<void> tkpubDbAction(Future<void> Function(ConfigDb db) action,
+Future<T> tkpubDbAction<T>(Future<T> Function(ConfigDb db) action,
     {bool? write}) async {
   var db = await _tkpubDbOpen();
   try {
-    await action(ConfigDb(db));
+    return await action(ConfigDb(db));
   } finally {
     if (write ?? false) {
       await _tkpubDbClose(db);
