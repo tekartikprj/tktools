@@ -9,6 +9,7 @@ import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_app_sembast/sembast.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_list_cmd.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub_symlink_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 
 import 'tkpub_add_cmd.dart';
@@ -25,6 +26,7 @@ class TkpubCommand extends ShellBinCommand {
     addCommand(TkpubRemoveCommand());
     addCommand(TkpubListCommand());
     addCommand(TkpubClearCommand());
+    addCommand(TkpubSymlinkCommand());
   }
 
   @override

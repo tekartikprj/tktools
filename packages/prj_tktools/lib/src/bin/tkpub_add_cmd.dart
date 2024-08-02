@@ -11,6 +11,7 @@ import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
 
 import 'tkpub.dart';
+import 'utils.dart';
 
 /// Dev flag
 const flagDevKey = 'dev';
@@ -271,20 +272,10 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
                   stdout.writeln('Adding $packageName: def: ${info.def}');
                 }
               } else {
-                var dependencyGithubPath = Uri.parse(package.gitUrl.v!).path;
-                if (dependencyGithubPath.endsWith('.git')) {
-                  dependencyGithubPath = dependencyGithubPath.substring(
-                      0, dependencyGithubPath.length - '.git'.length);
-                }
-                if (dependencyGithubPath.startsWith('/')) {
-                  dependencyGithubPath = dependencyGithubPath.substring(1);
-                }
-                var gitPath = package.gitPath.v?.trim();
-                var dependencyPath = normalize(absolute(joinAll([
-                  githubTop,
-                  dependencyGithubPath,
-                  if (gitPath?.isNotEmpty ?? false) gitPath!
-                ])));
+                var dependencyPath = getDependencyLocalPath(
+                    githubTop: githubTop,
+                    gitUrl: package.gitUrl.v!,
+                    gitPath: package.gitPath.v);
                 var relativePath = relative(dependencyPath, from: path);
 
                 if (hasDependency) {
@@ -362,18 +353,6 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
     });
     return true;
   }
-}
-
-/// Find tekartik github top
-String findGithubTop(String dirPath) {
-  var dir = Directory(normalize(dirPath)).absolute;
-  while (dir.path != '/') {
-    if (Directory(join(dir.path, 'github.com', 'tekartik')).existsSync()) {
-      return join(dir.path, 'github.com');
-    }
-    dir = dir.parent;
-  }
-  throw StateError('Cannot find top github.com dir');
 }
 
 extension on Map {
