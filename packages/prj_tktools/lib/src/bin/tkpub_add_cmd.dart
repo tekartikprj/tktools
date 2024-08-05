@@ -378,7 +378,7 @@ extension on Map {
         lines.add('$indent$key:');
         lines.addAll(value.toYamlStrings('$indent  '));
       } else {
-        lines.add('$indent$key: $value');
+        lines.add('$indent$key: ${safeYamlString(value)}');
       }
     }
     return lines;

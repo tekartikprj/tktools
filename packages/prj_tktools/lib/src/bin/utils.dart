@@ -41,3 +41,18 @@ String getDependencyGithubPath(
   }
   return dependencyGithubPath;
 }
+
+/// Safe yaml string
+String safeYamlString(Object? object) {
+  if (object == null) {
+    return '';
+  }
+  var value = object.toString();
+  if (value.contains(RegExp(r'[":]'))) {
+    return "'$value'";
+  }
+  if (value.contains(RegExp(r'[\\]')) || value.startsWith('>')) {
+    return '"$value"';
+  }
+  return value;
+}
