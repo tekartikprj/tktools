@@ -57,6 +57,7 @@ class _Rules {
   }
 
   void add(_Rule rule) {
+    rules.removeWhere((element) => element.name == rule.name);
     rules.add(rule);
   }
 
