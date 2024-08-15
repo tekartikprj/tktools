@@ -1,5 +1,5 @@
 include: package:tekartik_lints/package.yaml
 
 linter:
-  rules:
+  rules: []
     # some_rule: false

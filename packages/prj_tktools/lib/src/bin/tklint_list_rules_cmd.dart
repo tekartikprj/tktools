@@ -208,12 +208,34 @@ class Package {
   }();
 
   /// Get rules
+  Future<Rules> getIncludeRules(String path) async {
+    await _initialized;
+    var yaml = loadYaml(await File(path).readAsString()) as Map;
+    var include = yaml.getKeyPathValue(['include'])?.toString();
+    if (include != null) {
+      var resolvedInclude = await resolvePath(include);
+      if (verbose) {
+        stdout.writeln('handle include: $include ($resolvedInclude)');
+      }
+      return await getRules(resolvedInclude, handleInclude: true);
+    }
+    return Rules();
+  }
+
+  String _fixPath(String path) {
+    if (isAbsolute(path)) {
+      return path;
+    }
+    return join(this.path, path);
+  }
+
+  /// Get rules
   Future<Rules> getRules(String path,
       {bool? handleInclude, bool? fromInclude}) async {
     await _initialized;
     handleInclude ??= false;
     fromInclude ??= false;
-    var yaml = loadYaml(await File(path).readAsString()) as Map;
+    var yaml = loadYaml(await File(_fixPath(path)).readAsString()) as Map;
 
     Rules? includeRules;
     var rules = Rules();

@@ -35,6 +35,10 @@ dependencies:
     git:
       url: https://github.com/tekartik/common_utils.dart
       ref: dart3a
+  tekartik_pub:
+    git:
+      url: https://github.com/tekartik/pub.dart
+      ref: dart3a
   tekartik_sc:
     git:
       url: https://github.com/tekartik/sc.dart
