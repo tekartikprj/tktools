@@ -1,9 +1,11 @@
 import 'package:args/args.dart';
 import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
+
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tklint_list_rules_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/src/yaml_edit.dart';
 import 'package:tekartik_pub/io.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
@@ -58,7 +60,7 @@ Future<void> tklintFixRules(String path,
   final yamlEditor = YamlEditor(await file.readAsString());
   var yamlObject = rules.toYamlObject();
   // print(yamlObject);
-  yamlEditor.update(['linter', 'rules'], yamlObject);
+  yamlEditor.updateOrAdd(['linter', 'rules'], yamlObject);
   await file.writeAsString(yamlEditor.toString());
 }
 
