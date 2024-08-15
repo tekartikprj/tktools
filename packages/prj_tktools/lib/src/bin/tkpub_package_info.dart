@@ -115,7 +115,7 @@ class TkpubPackageInfo {
     if (other is TkpubPackageInfo) {
       if (target == other.target &&
           name == other.name &&
-          DeepCollectionEquality().equals(def, other.def)) {
+          const DeepCollectionEquality().equals(def, other.def)) {
         return true;
       }
     }

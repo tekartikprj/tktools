@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:tekartik_prj_tktools/src/bin/tklint_fix_rules_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 
 import 'tklint_list_rules_cmd.dart';
@@ -11,6 +12,7 @@ class TklintCommand extends ShellBinCommand {
   /// tkpub command
   TklintCommand() : super(name: 'tklint') {
     addCommand(TklintListRulesCommand());
+    addCommand(TklintFixRulesCommand());
   }
 
   @override
@@ -20,8 +22,11 @@ class TklintCommand extends ShellBinCommand {
   }
 }
 
+/// Compat
+Future<void> main(List<String> arguments) => tklintMain(arguments);
+
 /// Direct shell env Path dump run helper for testing.
-Future<void> main(List<String> arguments) async {
+Future<void> tklintMain(List<String> arguments) async {
   try {
     await TklintCommand().parseAndRun(arguments);
   } catch (e) {

@@ -1,6 +1,6 @@
-import 'package:tekartik_prj_tktools/src/bin/tklint.dart' as tklint;
+import 'package:tekartik_prj_tktools/tklint_bin.dart';
 
-/// Example
+/// tklint
 Future<void> main(List<String> arguments) async {
-  await tklint.main(arguments);
+  await tklintMain(arguments);
 }

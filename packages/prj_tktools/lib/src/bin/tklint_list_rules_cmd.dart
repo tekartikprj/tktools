@@ -8,16 +8,23 @@ import 'package:tekartik_common_utils/string_utils.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:yaml/yaml.dart';
 
-class _Rule {
+/// Rule
+class Rule {
+  /// Name
   final String name;
+
+  /// Enabled
   final bool enabled;
 
-  _Rule(this.name, this.enabled);
+  /// Rule
+  Rule(this.name, this.enabled);
 
+  /// To any string
   String toAnyString() {
     return '$name: $enabled';
   }
 
+  /// To enabled string (for list)
   String toEnabledString() {
     return '- $name';
   }
@@ -26,7 +33,7 @@ class _Rule {
   int get hashCode => name.hashCode;
   @override
   bool operator ==(Object other) {
-    if (other is _Rule) {
+    if (other is Rule) {
       return (name == other.name) && (enabled == other.enabled);
     }
     return false;
@@ -36,35 +43,42 @@ class _Rule {
   String toString() => toAnyString();
 }
 
-class _Rules {
-  late final List<_Rule> rules;
+/// Rules
+class Rules {
+  /// Rules
+  late final List<Rule> rules;
 
-  _Rules([List<_Rule>? rules]) {
-    this.rules = rules != null ? List.of(rules) : <_Rule>[];
+  /// Rules
+  Rules([List<Rule>? rules]) {
+    this.rules = rules != null ? List.of(rules) : <Rule>[];
   }
 
-  void removeRuleNames(List<String> ruleNames) {
+  void _removeRuleNames(List<String> ruleNames) {
     rules.removeWhere((element) => ruleNames.contains(element.name));
   }
 
-  List<String> get ruleNames {
+  List<String> get _ruleNames {
     return rules.map((e) => e.name).toList();
   }
 
-  void merge(_Rules rules) {
-    removeRuleNames(rules.ruleNames);
+  /// Merge (rules overrides existing rules)
+  void merge(Rules rules) {
+    _removeRuleNames(rules._ruleNames);
     this.rules.addAll(rules.rules);
   }
 
-  void add(_Rule rule) {
+  /// Add a rule
+  void add(Rule rule) {
     rules.removeWhere((element) => element.name == rule.name);
     rules.add(rule);
   }
 
+  /// Sort
   void sort() {
     rules.sort((a, b) => a.name.compareTo(b.name));
   }
 
+  /// True if all rules are enabled
   bool get areAllEnabled {
     for (var rule in rules) {
       if (!rule.enabled) {
@@ -74,6 +88,7 @@ class _Rules {
     return true;
   }
 
+  /// Check if a rule is enabled
   bool isEnabled(String name) {
     for (var rule in rules) {
       if (rule.name == name) {
@@ -83,6 +98,7 @@ class _Rules {
     return false;
   }
 
+  /// To string list
   List<String> toStringList({bool? forceAny}) {
     if (areAllEnabled && !(forceAny ?? false)) {
       return rules.map((e) => e.toEnabledString()).toList();
@@ -91,7 +107,21 @@ class _Rules {
     }
   }
 
-  void removeDifferentRules(_Rules fromRules) {
+  /// To yaml object
+  Object toYamlObject({bool? forceAny}) {
+    if (areAllEnabled && !(forceAny ?? false)) {
+      return rules.map((e) => e.name).toList();
+    } else {
+      var map = <String, Object>{};
+      for (var rule in rules) {
+        map[rule.name] = rule.enabled;
+      }
+      return map;
+    }
+  }
+
+  /// Remove different rules
+  void removeDifferentRules(Rules fromRules) {
     rules.removeWhere((element) => fromRules.rules.contains(element));
   }
 }
@@ -127,7 +157,7 @@ List rules overrides over another file
     } else {
       analysisOptionsPath = rest.first;
     }
-    var package = _Package('.', verbose: verbose);
+    var package = Package('.', verbose: verbose);
     var rules = await package.getRules(analysisOptionsPath,
         handleInclude: handleInclude, fromInclude: fromInclude);
 
@@ -143,12 +173,19 @@ List rules overrides over another file
   }
 }
 
-class _Package {
+/// Package
+class Package {
+  /// Path
   final String path;
+
+  /// Verbose
   final bool verbose;
 
+  /// Config map
   late Model configMap;
-  _Package(this.path, {this.verbose = false});
+
+  /// Create a package from a path.
+  Package(this.path, {this.verbose = false});
 
   /// Path or package path
   Future<String> resolvePath(String pathDef) async {
@@ -169,15 +206,17 @@ class _Package {
     configMap = await pathGetPackageConfigMap(path);
     //print('packages: $configMap');
   }();
-  Future<_Rules> getRules(String path,
+
+  /// Get rules
+  Future<Rules> getRules(String path,
       {bool? handleInclude, bool? fromInclude}) async {
     await _initialized;
     handleInclude ??= false;
     fromInclude ??= false;
     var yaml = loadYaml(await File(path).readAsString()) as Map;
 
-    _Rules? includeRules;
-    var rules = _Rules();
+    Rules? includeRules;
+    var rules = Rules();
     if (handleInclude) {
       var include = yaml.getKeyPathValue(['include'])?.toString();
       if (include != null) {
@@ -196,7 +235,7 @@ class _Package {
     if (rawRules is List) {
       for (var rawRule in rawRules) {
         if (rawRule is String) {
-          rules.add(_Rule(rawRule, true));
+          rules.add(Rule(rawRule, true));
         }
       }
     } else if (rawRules is Map) {
@@ -204,7 +243,7 @@ class _Package {
         var rule = entry.key as String;
         var value = entry.value;
         if (value is bool) {
-          rules.add(_Rule(rule, value));
+          rules.add(Rule(rule, value));
         }
       }
     }

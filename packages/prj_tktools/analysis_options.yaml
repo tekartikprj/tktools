@@ -1,6 +1,5 @@
-include: package:tekartik_lints/strict.yaml
+include: package:tekartik_lints/package.yaml
 
 linter:
   rules:
-    avoid_print: true
-    public_member_api_docs: true
+    # some_rule: false

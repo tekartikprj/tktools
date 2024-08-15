@@ -55,8 +55,11 @@ class _InitCommand extends ShellBinCommand {
   }
 }
 
+/// Compat.
+Future<void> main(List<String> arguments) => tkpubMain(arguments);
+
 /// Direct shell env Path dump run helper for testing.
-Future<void> main(List<String> arguments) async {
+Future<void> tkpubMain(List<String> arguments) async {
   try {
     await TkpubCommand().parseAndRun(arguments);
   } catch (e) {
