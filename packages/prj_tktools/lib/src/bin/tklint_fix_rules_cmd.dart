@@ -80,7 +80,7 @@ Fix rules overrides over another file
 
   @override
   FutureOr<bool> onRun() async {
-    var verbose = this.verbose ?? false;
+    var verbose = this.verbose;
     var rest = results.rest;
     var include = results.option('include');
     String? analysisOptionsPath;

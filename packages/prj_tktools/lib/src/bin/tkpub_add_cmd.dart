@@ -122,7 +122,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
       throw ArgumentError(
           'At least one argument expected (package name with optional target and dev)');
     }
-    var verbose = this.verbose ?? false;
+    var verbose = this.verbose;
 
     if (verbose) {
       stdout.writeln('Current directory ${Directory.current}');
