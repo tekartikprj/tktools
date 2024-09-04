@@ -206,11 +206,19 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
             Future<void> handlePath(String path) async {
               stdout.writeln('# ${relative(path, from: topPath)}');
               var localPubspecMap = await pathGetPubspecYamlMap(path);
+              var localPackageName =
+                  pubspecYamlGetPackageName(localPubspecMap)!;
+
+              if (packageName == localPackageName) {
+                if (verbose) {
+                  stdout.writeln('$packageName is the same as local package');
+                }
+                return;
+              }
               var isFlutterPackage =
                   pubspecYamlSupportsFlutter(localPubspecMap);
               var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
-              var localPackageName =
-                  pubspecYamlGetPackageName(localPubspecMap)!;
+
               var hasDependency =
                   allPackageWithDependency.contains(localPackageName);
               if (!hasDependency) {
@@ -305,6 +313,13 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
             Future<void> handlePath(String path) async {
               stdout.writeln('# ${relative(path, from: topPath)}');
               var pubspecMap = await pathGetPubspecYamlMap('.');
+              var localPackageName = pubspecYamlGetPackageName(pubspecMap)!;
+              if (packageName == localPackageName) {
+                if (verbose) {
+                  stdout.writeln('$packageName is the same as local package');
+                }
+                return;
+              }
               var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
               var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
 
