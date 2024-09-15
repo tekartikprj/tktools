@@ -2,6 +2,7 @@ import 'package:args/args.dart';
 // ignore: implementation_imports
 import 'package:process_run/src/mixin/shell_bin.dart';
 import 'package:process_run/stdio.dart';
+import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 
