@@ -6,8 +6,8 @@ import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_config_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 
+import '../utils.dart';
 import 'tkpub.dart';
-import 'utils.dart';
 
 /// Dev flag
 

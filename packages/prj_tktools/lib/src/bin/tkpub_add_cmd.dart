@@ -10,8 +10,8 @@ import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
 
+import '../utils.dart';
 import 'tkpub.dart';
-import 'utils.dart';
 
 /// Dev flag
 const flagDevKey = 'dev';

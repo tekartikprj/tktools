@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart';
+import 'package:tekartik_common_utils/string_utils.dart';
 
 /// Find tekartik github top
 String findGithubTop(String dirPath) {
@@ -28,10 +29,27 @@ String getDependencyLocalPath(
   return dependencyPath;
 }
 
+/// Find the path of a url
+String safeGetUrlPath(String url) {
+  var uri = Uri.tryParse(url);
+  if (uri != null) {
+    return uri.path;
+  }
+  // git like uri?
+  if (url.startsWith('git@')) {
+    var path = url.splitFirst(':')[1];
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+    return path;
+  }
+  throw ArgumentError('Unsupported url $url');
+}
+
 /// Get the github path of a dependency
 String getDependencyGithubPath(
     {required String githubTop, required String gitUrl}) {
-  var dependencyGithubPath = Uri.parse(gitUrl).path;
+  var dependencyGithubPath = safeGetUrlPath(gitUrl);
   if (dependencyGithubPath.endsWith('.git')) {
     dependencyGithubPath = dependencyGithubPath.substring(
         0, dependencyGithubPath.length - '.git'.length);
