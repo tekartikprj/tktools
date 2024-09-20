@@ -20,6 +20,7 @@ class TkpubConfigCommand extends ShellBinCommand {
   /// tkpub config
   TkpubConfigCommand() : super(name: 'config') {
     addCommand(_SetCommand());
+    addCommand(_GetCommand());
     addCommand(_DeleteCommand());
     addCommand(_SetRefCommand());
     addCommand(_ListCommand());
@@ -73,9 +74,37 @@ class _SetCommand extends ShellBinCommand {
         ..gitPath.setValue(gitPath)
         ..gitRef.setValue(gitRef);
       await db.setPackage(package);
+      writePackageConfig(package);
     }, write: true);
     return true;
   }
+}
+
+class _GetCommand extends ShellBinCommand {
+  _GetCommand()
+      : super(name: 'get', parser: ArgParser(allowTrailingOptions: true));
+
+  @override
+  FutureOr<bool> onRun() async {
+    var rest = results.rest;
+    if (rest.length != 1) {
+      throw ArgumentError('One argument expected (package name)');
+    }
+    var packageName = rest.first;
+
+    await tkpubDbAction((db) async {
+      var package = await db.getPackage(packageName);
+      stdout.writeln(
+          '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
+    });
+    return true;
+  }
+}
+
+/// Write package config
+void writePackageConfig(DbPackage package) {
+  stdout.writeln(
+      '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
 }
 
 class _ListCommand extends ShellBinCommand {
