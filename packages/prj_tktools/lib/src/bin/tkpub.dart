@@ -7,7 +7,6 @@ import 'package:sembast/sembast_memory.dart';
 import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
-import 'package:tekartik_app_sembast/sembast.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_copy_files_cmd.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_list_cmd.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_symlink_cmd.dart';
