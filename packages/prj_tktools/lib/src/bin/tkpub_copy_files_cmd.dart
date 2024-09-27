@@ -3,9 +3,9 @@ import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
 import '../utils.dart';
-import 'tkpub.dart';
 
 /// Destination dir
 const optionDestinationDir = 'dir';
@@ -40,7 +40,7 @@ tkpub copy_files package file1 [file2 file3...] [--dir destination_dir]
       printUsage();
       throw ArgumentError('No file specified');
     }
-    var package = await tkpubDbAction((db) async {
+    var package = await tkPubDbAction((db) async {
       return await db.getPackage(packageName);
     });
     var githubTop = normalize(absolute(findGithubTop(path)));

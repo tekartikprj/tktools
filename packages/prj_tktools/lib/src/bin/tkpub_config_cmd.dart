@@ -4,7 +4,7 @@ import 'package:process_run/src/mixin/shell_bin.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
-import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
+import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
 /// git url option
 const optionGitUrl = 'git-url';
@@ -39,7 +39,7 @@ class _DeleteCommand extends ShellBinCommand {
     }
 
     var packageName = rest.first;
-    await tkpubDbAction((db) async {
+    await tkPubDbAction((db) async {
       await db.deletePackage(packageName);
     }, write: true);
     return true;
@@ -68,8 +68,8 @@ class _SetCommand extends ShellBinCommand {
     }
 
     var packageName = rest.first;
-    await tkpubDbAction((db) async {
-      var package = packagesStore.record(packageName).cv()
+    await tkPubDbAction((db) async {
+      var package = tkPubPackagesStore.record(packageName).cv()
         ..gitUrl.v = gitUrl
         ..gitPath.setValue(gitPath)
         ..gitRef.setValue(gitRef);
@@ -92,7 +92,7 @@ class _GetCommand extends ShellBinCommand {
     }
     var packageName = rest.first;
 
-    await tkpubDbAction((db) async {
+    await tkPubDbAction((db) async {
       var package = await db.getPackage(packageName);
       stdout.writeln(
           '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
@@ -102,7 +102,7 @@ class _GetCommand extends ShellBinCommand {
 }
 
 /// Write package config
-void writePackageConfig(DbPackage package) {
+void writePackageConfig(TkPubDbPackage package) {
   stdout.writeln(
       '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
 }
@@ -113,8 +113,8 @@ class _ListCommand extends ShellBinCommand {
 
   @override
   FutureOr<bool> onRun() async {
-    await tkpubDbAction((db) async {
-      var packages = await packagesStore.query().getRecords(db.db);
+    await tkPubDbAction((db) async {
+      var packages = await tkPubPackagesStore.query().getRecords(db.db);
       for (var package in packages) {
         stdout.writeln(
             '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
@@ -135,8 +135,8 @@ class _SetRefCommand extends ShellBinCommand {
       throw ArgumentError('One argument expected (ref name)');
     }
 
-    await tkpubDbAction((db) async {
-      var ref = configRefRecord.cv()..gitRef.v = rest.first;
+    await tkPubDbAction((db) async {
+      var ref = tkPubConfigRefRecord.cv()..gitRef.v = rest.first;
       await ref.put(db.db);
     }, write: true);
     return true;

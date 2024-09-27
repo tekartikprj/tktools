@@ -7,11 +7,11 @@ import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_package_info.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/tkpub_db.dart';
 import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
 
 import '../utils.dart';
-import 'tkpub.dart';
 
 /// Dev flag
 const flagDevKey = 'dev';
@@ -138,7 +138,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
       }
     }
 
-    await tkpubDbAction((db) async {
+    await tkPubDbAction((db) async {
       final topPath = '.';
 
       if (isClear) {

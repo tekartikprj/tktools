@@ -3,8 +3,8 @@ import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
-import 'tkpub.dart';
 import 'tkpub_add_cmd.dart';
 
 /// Dev flag
@@ -41,8 +41,8 @@ class TkpubListCommand extends ShellBinCommand {
 
     var path = '.';
 
-    var packages = await tkpubDbAction((db) async {
-      var packages = await packagesStore.query().getRecords(db.db);
+    var packages = await tkPubDbAction((db) async {
+      var packages = await tkPubPackagesStore.query().getRecords(db.db);
       return packages.map((dbPackage) => dbPackage.id).toList();
     });
 
