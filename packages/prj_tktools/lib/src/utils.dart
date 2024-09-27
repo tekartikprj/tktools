@@ -2,9 +2,42 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:tekartik_common_utils/string_utils.dart';
+import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
+
+/// Find tekartik github top
+Future<String> tkPubFindGithubTop({String? dirPath}) async {
+  if (dirPath != null) {
+    var dir = _findGithubTopOrNull(dirPath);
+    if (dir != null) {
+      return dir;
+    }
+  }
+  var dir = _findGithubTopOrNull(Directory.current.path);
+  if (dir != null) {
+    return dir;
+  }
+  var prefs = await openPrefs();
+  var prefsPath = prefs.getString(prefsKeyPath);
+  if (prefsPath != null) {
+    var dir = _findGithubTopOrNull(prefsPath);
+    if (dir != null) {
+      return dir;
+    }
+  }
+  throw StateError('Cannot find top github.com dir');
+}
 
 /// Find tekartik github top
 String findGithubTop(String dirPath) {
+  var dir = _findGithubTopOrNull(dirPath);
+  if (dir != null) {
+    return dir;
+  }
+  throw StateError('Cannot find top github.com dir');
+}
+
+/// Find tekartik github top
+String? _findGithubTopOrNull(String dirPath) {
   var dir = Directory(normalize(dirPath)).absolute;
   while (dir.path != '/') {
     if (Directory(join(dir.path, 'github.com', 'tekartik')).existsSync()) {
@@ -12,7 +45,7 @@ String findGithubTop(String dirPath) {
     }
     dir = dir.parent;
   }
-  throw StateError('Cannot find top github.com dir');
+  return null;
 }
 
 /// Get the local path of a dependency (absolute)
