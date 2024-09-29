@@ -28,6 +28,9 @@ const flagPubspecOverridesKey = 'pubspec-overrides';
 /// Recursive
 const flagRecursiveKey = 'recursive';
 
+/// Read config instead of filtering by dependencies
+const flagReadConfigKey = 'read-config';
+
 /// Clear
 class TkpubClearCommand extends TkpubAddRemoveCommand {
   @override
@@ -83,6 +86,40 @@ Add package using user env config
         help: 'Remove from pubspec_overrides.yaml');
     parser.addFlag(flagRecursiveKey,
         help: 'Go to every subfolder (pubspec-overrides only for now)');
+    parser.addFlag(flagReadConfigKey,
+        help: 'Read config instead of filtering by dependencies');
+  }
+}
+
+class _PackageToAdd {
+  final String path;
+  final String dartPubAddArg;
+
+  _PackageToAdd(this.path, this.dartPubAddArg);
+}
+
+class _PackagesToAdd {
+  final String path;
+  final List<String> dartPubAddArgs;
+
+  _PackagesToAdd(this.path, this.dartPubAddArgs);
+}
+
+class _PackageToAddList {
+  final list = <_PackageToAdd>[];
+  void add(String path, String dartPubAddArg) {
+    list.add(_PackageToAdd(path, dartPubAddArg));
+  }
+
+  List<_PackagesToAdd> group() {
+    var map = <String, List<String>>{};
+    for (var packageToAdd in list) {
+      var path = packageToAdd.path;
+      var dartPubAddArg = packageToAdd.dartPubAddArg;
+      var list = map.putIfAbsent(path, () => <String>[]);
+      list.add(dartPubAddArg);
+    }
+    return map.entries.map((e) => _PackagesToAdd(e.key, e.value)).toList();
   }
 }
 
@@ -106,6 +143,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
     var globalPubspecOverrides = results.flag(flagPubspecOverridesKey);
     var recursive = results.flag(flagRecursiveKey);
     var force = isAdd ? results.flag(flagForceKey) : false;
+    var readConfig = results.flag(flagReadConfigKey);
 
     if (globalOverrides) {
       if (globalOverrides || globalOverrides) {
@@ -138,6 +176,9 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
       }
     }
 
+    /// Direct or dev dependencies to add.
+    final toAdd = _PackageToAddList();
+
     await tkPubDbAction((db) async {
       final topPath = '.';
 
@@ -167,6 +208,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
 
           var pubspecOverrides = info.target == TkpubTarget.pubspecOverrides ||
               (info.target == null && globalPubspecOverrides);
+
           if (pubspecOverrides) {
             var dependencies = [packageName];
 
@@ -176,8 +218,65 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
             if (gitTopLevelPath != null) {
               var pathsHandled = <String>{};
               while (true) {
-                var allPaths = await recursivePubPath([gitTopLevelPath],
-                    dependencies: dependencies);
+                List<String> allPaths;
+                if (readConfig) {
+                  allPaths = <String>[];
+                  var allPksPaths = await recursivePubPath(
+                    [gitTopLevelPath],
+                  );
+                  for (var pkgPath in allPksPaths.toList()) {
+                    var pubspecYaml = await pathGetPubspecYamlMap(pkgPath);
+                    if (pubspecYamlHasAnyDependencies(
+                        pubspecYaml, dependencies)) {
+                      if (verbose) {
+                        stdout.writeln(
+                            '$pkgPath has any dependencies in $dependencies');
+                      }
+                      allPaths.add(pkgPath);
+                    } else {
+                      if (verbose) {
+                        stdout.writeln(
+                            '$pkgPath does not have any dependencies in $dependencies, checking package-config.yaml');
+                      }
+
+                      Model? packageConfigMap;
+                      try {
+                        packageConfigMap =
+                            await pathGetPackageConfigMap(pkgPath);
+                      } catch (_) {
+                        try {
+                          await Shell(workingDirectory: pkgPath).run('pub get');
+
+                          packageConfigMap =
+                              await pathGetPubspecYamlMap(pkgPath);
+                        } catch (e) {
+                          stderr.writeln(
+                              'Error: $e failed to get package-config.yaml');
+                        }
+                      }
+                      if (packageConfigMap != null) {
+                        if (packageConfigGetPackages(packageConfigMap)
+                            .toSet()
+                            .intersection(dependencies.toSet())
+                            .isNotEmpty) {
+                          if (verbose) {
+                            stdout.writeln(
+                                '$pkgPath has any dependencies in $dependencies');
+                          }
+                          allPaths.add(pkgPath);
+                        } else {
+                          if (verbose) {
+                            stdout.writeln(
+                                '$pkgPath does not have any dependencies in $dependencies');
+                          }
+                        }
+                      }
+                    }
+                  }
+                } else {
+                  allPaths = await recursivePubPath([gitTopLevelPath],
+                      dependencies: dependencies);
+                }
 
                 var newAll = allPackageWithDependency.toSet();
                 for (var path in allPaths) {
@@ -338,25 +437,25 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
                   if (!force) {
                     throw StateError('Package not found $packageName');
                   }
-                  await shell
-                      .run('$dartOrFlutter pub add ${shellArgument('$prefix'
-                              '$packageName')}'
-                          ' --directory .');
+                  toAdd.add(
+                      topPath,
+                      shellArgument('$prefix'
+                          '$packageName'));
                 } else {
-                  await shell
-                      .run('$dartOrFlutter pub add ${shellArgument('$prefix'
-                              '$packageName:'
-                              '${jsonEncode({
-                        if (package.gitUrl.isNotNull)
-                          'git': {
-                            'url': package.gitUrl.v,
-                            if (package.gitPath.isNotNull)
-                              'path': package.gitPath.v,
-                            if (package.gitRef.isNotNull)
-                              'ref': package.gitRef.v,
-                          },
-                      })}')}'
-                          ' --directory .');
+                  toAdd.add(
+                      topPath,
+                      shellArgument('$prefix'
+                          '$packageName:'
+                          '${jsonEncode({
+                            if (package.gitUrl.isNotNull)
+                              'git': {
+                                'url': package.gitUrl.v,
+                                if (package.gitPath.isNotNull)
+                                  'path': package.gitPath.v,
+                                if (package.gitRef.isNotNull)
+                                  'ref': package.gitRef.v,
+                              },
+                          })}'));
                 }
               }
             }
@@ -366,6 +465,10 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
         }
       }
     });
+    for (var packagesToAdd in toAdd.group()) {
+      var shell = Shell(workingDirectory: packagesToAdd.path);
+      await shell.run('dart pub add ${packagesToAdd.dartPubAddArgs.join(' ')}');
+    }
     return true;
   }
 }

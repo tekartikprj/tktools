@@ -28,8 +28,11 @@ class TkPubDbPackage extends DbStringRecordBase {
   /// ref (optional, default to config)
   final gitRef = CvField<String>('gitRef');
 
+  /// published (hosted)
+  final published = CvField<String>('published');
+
   @override
-  CvFields get fields => [gitUrl, gitPath, gitRef];
+  CvFields get fields => [gitUrl, gitPath, gitRef, published];
 }
 
 /// Config database.
