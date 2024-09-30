@@ -6,10 +6,10 @@ void main() {
     expect(
         TkpubPackageInfo.parse('dev:test:{"dummy":"test"}'),
         TkpubPackageInfo(
-            target: TkpubTarget.dev, name: 'test', def: {'dummy': 'test'}));
+            target: TkPubTarget.dev, name: 'test', def: {'dummy': 'test'}));
     expect(TkpubPackageInfo.parse('test'), TkpubPackageInfo(name: 'test'));
     expect(TkpubPackageInfo.parse("'test'"), TkpubPackageInfo(name: 'test'));
     expect(TkpubPackageInfo.parse('dev:test'),
-        TkpubPackageInfo(target: TkpubTarget.dev, name: 'test'));
+        TkpubPackageInfo(target: TkPubTarget.dev, name: 'test'));
   });
 }

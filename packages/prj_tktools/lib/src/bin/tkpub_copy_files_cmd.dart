@@ -2,8 +2,7 @@ import 'package:args/args.dart';
 import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
-import 'package:tekartik_prj_tktools/src/process_run_import.dart';
-import 'package:tekartik_prj_tktools/tkpub_db.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 
 import '../utils.dart';
 
@@ -11,9 +10,9 @@ import '../utils.dart';
 const optionDestinationDir = 'dir';
 
 /// Clear
-class TkpubCopyFilesCommand extends ShellBinCommand {
+class TkPubCopyFilesCommand extends TkPubSubCommand {
   /// Clear
-  TkpubCopyFilesCommand()
+  TkPubCopyFilesCommand()
       : super(
             name: 'copy_files',
             parser: ArgParser(allowTrailingOptions: true),
@@ -40,7 +39,7 @@ tkpub copy_files package file1 [file2 file3...] [--dir destination_dir]
       printUsage();
       throw ArgumentError('No file specified');
     }
-    var package = await tkPubDbAction((db) async {
+    var package = await dbAction((db) async {
       return await db.getPackage(packageName);
     });
     var githubTop = normalize(absolute(findGithubTop(path)));

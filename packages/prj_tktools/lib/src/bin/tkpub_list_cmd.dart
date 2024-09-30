@@ -2,6 +2,7 @@ import 'package:args/args.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
@@ -10,9 +11,9 @@ import 'tkpub_add_cmd.dart';
 /// Dev flag
 
 /// Clear
-class TkpubListCommand extends ShellBinCommand {
+class TkPubListCommand extends TkPubSubCommand {
   /// Clear
-  TkpubListCommand()
+  TkPubListCommand()
       : super(
             name: 'list',
             parser: ArgParser(allowTrailingOptions: true),
@@ -41,7 +42,7 @@ class TkpubListCommand extends ShellBinCommand {
 
     var path = '.';
 
-    var packages = await tkPubDbAction((db) async {
+    var packages = await dbAction((db) async {
       var packages = await tkPubPackagesStore.query().getRecords(db.db);
       return packages.map((dbPackage) => dbPackage.id).toList();
     });

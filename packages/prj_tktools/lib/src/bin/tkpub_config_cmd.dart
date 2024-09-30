@@ -4,6 +4,7 @@ import 'package:process_run/src/mixin/shell_bin.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
 /// git url option
@@ -16,18 +17,25 @@ const optionGitPath = 'git-path';
 const optionGitRef = 'git-ref';
 
 /// tkpub config
-class TkpubConfigCommand extends ShellBinCommand {
+class TkPubConfigCommand extends TkPubSubCommand {
   /// tkpub config
-  TkpubConfigCommand() : super(name: 'config') {
+  TkPubConfigCommand() : super(name: 'config') {
     addCommand(_SetCommand());
     addCommand(_GetCommand());
     addCommand(_DeleteCommand());
     addCommand(_SetRefCommand());
+    addCommand(_GetRefCommand());
     addCommand(_ListCommand());
+    addCommand(_GetExportPathCommand());
   }
 }
 
-class _DeleteCommand extends ShellBinCommand {
+abstract class _TkPubConfigSubCommand extends ShellBinCommand {
+  TkPubConfigCommand get tkPubConfigCommand => parent as TkPubConfigCommand;
+  _TkPubConfigSubCommand({required super.name, super.parser}) : super();
+}
+
+class _DeleteCommand extends _TkPubConfigSubCommand {
   _DeleteCommand()
       : super(name: 'delete', parser: ArgParser(allowTrailingOptions: true));
 
@@ -39,14 +47,14 @@ class _DeleteCommand extends ShellBinCommand {
     }
 
     var packageName = rest.first;
-    await tkPubDbAction((db) async {
+    await tkPubConfigCommand.dbAction((db) async {
       await db.deletePackage(packageName);
     }, write: true);
     return true;
   }
 }
 
-class _SetCommand extends ShellBinCommand {
+class _SetCommand extends _TkPubConfigSubCommand {
   _SetCommand()
       : super(name: 'set', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addOption(optionGitUrl, help: 'Git url');
@@ -68,7 +76,7 @@ class _SetCommand extends ShellBinCommand {
     }
 
     var packageName = rest.first;
-    await tkPubDbAction((db) async {
+    await tkPubConfigCommand.dbAction((db) async {
       var package = tkPubPackagesStore.record(packageName).cv()
         ..gitUrl.v = gitUrl
         ..gitPath.setValue(gitPath)
@@ -80,7 +88,7 @@ class _SetCommand extends ShellBinCommand {
   }
 }
 
-class _GetCommand extends ShellBinCommand {
+class _GetCommand extends _TkPubConfigSubCommand {
   _GetCommand()
       : super(name: 'get', parser: ArgParser(allowTrailingOptions: true));
 
@@ -92,7 +100,7 @@ class _GetCommand extends ShellBinCommand {
     }
     var packageName = rest.first;
 
-    await tkPubDbAction((db) async {
+    await tkPubConfigCommand.dbAction((db) async {
       var package = await db.getPackage(packageName);
       stdout.writeln(
           '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
@@ -107,13 +115,13 @@ void writePackageConfig(TkPubDbPackage package) {
       '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
 }
 
-class _ListCommand extends ShellBinCommand {
+class _ListCommand extends _TkPubConfigSubCommand {
   _ListCommand()
       : super(name: 'list', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
-    await tkPubDbAction((db) async {
+    await tkPubConfigCommand.dbAction((db) async {
       var packages = await tkPubPackagesStore.query().getRecords(db.db);
       for (var package in packages) {
         stdout.writeln(
@@ -124,7 +132,7 @@ class _ListCommand extends ShellBinCommand {
   }
 }
 
-class _SetRefCommand extends ShellBinCommand {
+class _SetRefCommand extends _TkPubConfigSubCommand {
   _SetRefCommand()
       : super(name: 'set-ref', parser: ArgParser(allowTrailingOptions: true));
 
@@ -135,10 +143,39 @@ class _SetRefCommand extends ShellBinCommand {
       throw ArgumentError('One argument expected (ref name)');
     }
 
-    await tkPubDbAction((db) async {
+    await tkPubConfigCommand.dbAction((db) async {
       var ref = tkPubConfigRefRecord.cv()..gitRef.v = rest.first;
       await ref.put(db.db);
     }, write: true);
+    return true;
+  }
+}
+
+class _GetRefCommand extends _TkPubConfigSubCommand {
+  _GetRefCommand()
+      : super(name: 'get-ref', parser: ArgParser(allowTrailingOptions: true));
+
+  @override
+  FutureOr<bool> onRun() async {
+    var gitRef = await tkPubConfigCommand.dbAction((db) async {
+      var config = await tkPubConfigRefRecord.get(db.db);
+      return config?.gitRef.v;
+    });
+    stdout.writeln(gitRef ?? '<none>');
+    return true;
+  }
+}
+
+class _GetExportPathCommand extends _TkPubConfigSubCommand {
+  _GetExportPathCommand()
+      : super(
+            name: 'get-export-path',
+            parser: ArgParser(allowTrailingOptions: true));
+
+  @override
+  FutureOr<bool> onRun() async {
+    var configExportPath = await tkPubConfigCommand.getConfigExportPath();
+    stdout.writeln(configExportPath ?? '<none>');
     return true;
   }
 }

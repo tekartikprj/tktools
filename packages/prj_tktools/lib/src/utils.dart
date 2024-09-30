@@ -17,7 +17,7 @@ Future<String> tkPubFindGithubTop({String? dirPath}) async {
     return dir;
   }
   var prefs = await openPrefs();
-  var prefsPath = prefs.getString(prefsKeyPath);
+  var prefsPath = prefs.getString(prefsKeyConfigExportPath);
   if (prefsPath != null) {
     var dir = _findGithubTopOrNull(prefsPath);
     if (dir != null) {

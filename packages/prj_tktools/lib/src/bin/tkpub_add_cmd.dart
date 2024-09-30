@@ -5,9 +5,9 @@ import 'package:process_run/shell.dart';
 import 'package:process_run/stdio.dart';
 // ignore: implementation_imports
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_package_info.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
-import 'package:tekartik_prj_tktools/tkpub_db.dart';
 import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
 
@@ -32,12 +32,12 @@ const flagRecursiveKey = 'recursive';
 const flagReadConfigKey = 'read-config';
 
 /// Clear
-class TkpubClearCommand extends TkpubAddRemoveCommand {
+class TkPubClearCommand extends TkPubAddRemoveCommand {
   @override
   bool get isClear => true;
 
   /// Clear
-  TkpubClearCommand()
+  TkPubClearCommand()
       : super(name: 'clear', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagPubspecOverridesKey,
         help: 'Clear pubspec_overrides.yaml');
@@ -47,12 +47,12 @@ class TkpubClearCommand extends TkpubAddRemoveCommand {
 }
 
 /// Pub remove.
-class TkpubRemoveCommand extends TkpubAddRemoveCommand {
+class TkPubRemoveCommand extends TkPubAddRemoveCommand {
   @override
   bool get isRemove => true;
 
   /// Pub remove
-  TkpubRemoveCommand()
+  TkPubRemoveCommand()
       : super(name: 'remove', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagDevKey, help: 'Remove from dev_dependencies mode');
     parser.addFlag(flagOverridesKey, help: 'Remove from dependecy_overrides');
@@ -64,12 +64,12 @@ class TkpubRemoveCommand extends TkpubAddRemoveCommand {
 }
 
 /// Pub add
-class TkpubAddCommand extends TkpubAddRemoveCommand {
+class TkPubAddCommand extends TkPubAddRemoveCommand {
   @override
   bool get isAdd => true;
 
   /// Pub add
-  TkpubAddCommand()
+  TkPubAddCommand()
       : super(
             name: 'add',
             parser: ArgParser(allowTrailingOptions: true),
@@ -124,7 +124,7 @@ class _PackageToAddList {
 }
 
 /// Add/remove
-abstract class TkpubAddRemoveCommand extends ShellBinCommand {
+abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
   /// true if is add
   bool get isAdd => false;
 
@@ -135,7 +135,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
   bool get isClear => false;
 
   /// Add/remove
-  TkpubAddRemoveCommand({required super.name, super.parser, super.description});
+  TkPubAddRemoveCommand({required super.name, super.parser, super.description});
   @override
   FutureOr<bool> onRun() async {
     var globalDev = !isClear ? results.flag(flagDevKey) : false;
@@ -179,7 +179,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
     /// Direct or dev dependencies to add.
     final toAdd = _PackageToAddList();
 
-    await tkPubDbAction((db) async {
+    await dbAction((db) async {
       final topPath = '.';
 
       if (isClear) {
@@ -206,7 +206,7 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
           //var packageHasDefinition = packageName != packageNameOrDef;
           var package = await db.getPackageOrNull(packageName);
 
-          var pubspecOverrides = info.target == TkpubTarget.pubspecOverrides ||
+          var pubspecOverrides = info.target == TkPubTarget.pubspecOverrides ||
               (info.target == null && globalPubspecOverrides);
 
           if (pubspecOverrides) {
@@ -423,9 +423,9 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
               var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
 
               var shell = Shell(workingDirectory: topPath);
-              var dev = info.target == TkpubTarget.dev ||
+              var dev = info.target == TkPubTarget.dev ||
                   (info.target == null && globalDev);
-              var overrides = info.target == TkpubTarget.override ||
+              var overrides = info.target == TkPubTarget.override ||
                   (info.target == null && globalPubspecOverrides);
 
               var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');

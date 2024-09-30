@@ -6,7 +6,7 @@ import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
 /// path prefs key.
-const prefsKeyPath = 'path';
+const prefsKeyConfigExportPath = 'path';
 
 /// Db config ref
 class DbConfigRef extends DbStringRecordBase {
@@ -99,16 +99,19 @@ var tkPubConfigRefRecord =
 
 late String _configExportPath;
 var _initialized = false;
-Future<Database> _tkpubDbOpen() async {
+Future<Database> _tkpubDbOpen({String? configExportPath}) async {
   if (!_initialized) {
-    var prefs = await openPrefs();
-    var prefsPath = prefs.getString(prefsKeyPath);
-    if (prefsPath == null) {
+    configExportPath ??= await () async {
+      var prefs = await openPrefs();
+      return prefs.getString(prefsKeyConfigExportPath);
+    }();
+
+    if (configExportPath == null) {
       throw StateError('Not intialized, call tkpub_init first');
     } else {
       cvAddConstructor(TkPubDbPackage.new);
       cvAddConstructor(DbConfigRef.new);
-      _configExportPath = prefsPath;
+      _configExportPath = configExportPath;
       _initialized = true;
     }
   }
@@ -138,8 +141,8 @@ Future<void> _tkpubDbClose(Database db) async {
 
 /// tkpub action on db, import & export
 Future<T> tkPubDbAction<T>(Future<T> Function(ConfigDb db) action,
-    {bool? write}) async {
-  var db = await _tkpubDbOpen();
+    {bool? write, String? configExportPath}) async {
+  var db = await _tkpubDbOpen(configExportPath: configExportPath);
   try {
     return await action(ConfigDb(db));
   } finally {

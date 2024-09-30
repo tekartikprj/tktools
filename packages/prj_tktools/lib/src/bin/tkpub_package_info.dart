@@ -3,7 +3,7 @@ import 'package:collection/collection.dart';
 import 'package:cv/cv.dart';
 
 /// Pubspec target
-enum TkpubTarget {
+enum TkPubTarget {
   /// dev: target
   dev,
 
@@ -15,13 +15,13 @@ enum TkpubTarget {
 }
 
 /// Convert target to string
-String tkpubTargetToString(TkpubTarget target) {
+String tkpubTargetToString(TkPubTarget target) {
   switch (target) {
-    case TkpubTarget.dev:
+    case TkPubTarget.dev:
       return 'dev';
-    case TkpubTarget.override:
+    case TkPubTarget.override:
       return 'override';
-    case TkpubTarget.pubspecOverrides:
+    case TkPubTarget.pubspecOverrides:
       return 'pubspec_overrides';
   }
 }
@@ -35,7 +35,7 @@ class TkpubPackageInfo {
   final String name;
 
   /// Target
-  final TkpubTarget? target;
+  final TkPubTarget? target;
 
   /// Package info
   TkpubPackageInfo({this.def, required this.name, this.target});
@@ -52,21 +52,21 @@ class TkpubPackageInfo {
     var parts = arg.split(':');
     Model? def;
     String name;
-    TkpubTarget? target;
+    TkPubTarget? target;
 
     bool isDef(String part) {
       return part.startsWith('{');
     }
 
-    TkpubTarget getTarget(int partIndex) {
+    TkPubTarget getTarget(int partIndex) {
       var part = parts[partIndex].trim();
       switch (part) {
         case 'dev':
-          return TkpubTarget.dev;
+          return TkPubTarget.dev;
         case 'override':
-          return TkpubTarget.override;
+          return TkPubTarget.override;
         case 'pubspec_overrides':
-          return TkpubTarget.pubspecOverrides;
+          return TkPubTarget.pubspecOverrides;
       }
       throw 'Invalid target: $part';
     }

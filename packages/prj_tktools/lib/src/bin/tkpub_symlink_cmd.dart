@@ -3,8 +3,8 @@ import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_config_cmd.dart';
-import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/tkpub_db.dart';
 
 import '../utils.dart';
@@ -12,9 +12,9 @@ import '../utils.dart';
 /// Dev flag
 
 /// Clear
-class TkpubSymlinkCommand extends ShellBinCommand {
+class TkPubSymlinkCommand extends TkPubSubCommand {
   /// Clear
-  TkpubSymlinkCommand()
+  TkPubSymlinkCommand()
       : super(
             name: 'symlink',
             parser: ArgParser(allowTrailingOptions: true),
@@ -35,7 +35,7 @@ tkpub symlink giturl1 [giturl2]
     if (rawPackages.isEmpty) {
       throw ArgumentError('No package to symlink');
     }
-    var allDbPackages = await tkPubDbAction((db) async {
+    var allDbPackages = await dbAction((db) async {
       return await tkPubPackagesStore.query().getRecords(db.db);
     });
     var packages = <String>{};

@@ -10,3 +10,10 @@ Future<String> tkPubGetPackageLocalPath(
       gitUrl: dbPackage.gitUrl.v!,
       gitPath: dbPackage.gitPath.v);
 }
+
+/// Get config export path
+Future<String?> tkPubGetConfigExportPath() async {
+  var prefs = await openPrefs();
+  var configExportPath = prefs.getString(prefsKeyConfigExportPath);
+  return configExportPath;
+}

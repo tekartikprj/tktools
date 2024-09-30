@@ -1,1 +1,1 @@
-export 'src/bin/tkpub.dart' show tkpubMain;
+export 'src/bin/tkpub.dart' show tkPubMain;
