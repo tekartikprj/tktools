@@ -466,8 +466,13 @@ abstract class TkpubAddRemoveCommand extends ShellBinCommand {
       }
     });
     for (var packagesToAdd in toAdd.group()) {
-      var shell = Shell(workingDirectory: packagesToAdd.path);
-      await shell.run('dart pub add ${packagesToAdd.dartPubAddArgs.join(' ')}');
+      var path = packagesToAdd.path;
+      var pubspecMap = await pathGetPubspecYamlMap(path);
+      var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
+      var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
+      var shell = Shell(workingDirectory: path);
+      await shell.run(
+          '$dartOrFlutter pub add ${packagesToAdd.dartPubAddArgs.join(' ')}');
     }
     return true;
   }
