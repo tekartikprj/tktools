@@ -78,16 +78,18 @@ tkpub add [dev:|override:|pubspec_overrides:]package1 [package2]
 
 Add package using user env config
       ''') {
-    parser.addFlag(flagDevKey, help: 'Add to dev_dependencies mode');
-    parser.addFlag(flagOverridesKey, help: 'Add to dependecy_overrides');
+    parser.addFlag(flagDevKey, abbr: 'd', help: 'Add to dev_dependencies mode');
+    parser.addFlag(flagOverridesKey,
+        abbr: 'o', help: 'Add to dependecy_overrides');
     parser.addFlag(flagForceKey,
-        help: 'Force adding (hosted only or specified)');
+        abbr: 'f', help: 'Force adding (hosted only or specified)');
     parser.addFlag(flagPubspecOverridesKey,
-        help: 'Remove from pubspec_overrides.yaml');
+        abbr: 'p', help: 'Add to pubspec_overrides.yaml');
     parser.addFlag(flagRecursiveKey,
+        abbr: 'r',
         help: 'Go to every subfolder (pubspec-overrides only for now)');
     parser.addFlag(flagReadConfigKey,
-        help: 'Read config instead of filtering by dependencies');
+        abbr: 'c', help: 'Read config instead of filtering by dependencies');
   }
 }
 
