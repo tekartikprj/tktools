@@ -16,7 +16,7 @@ Future<void> pathVersionBump(
   ext ??= false;
   var pubspecYaml = await pathGetPubspecYamlMap(path);
   var version = pubspecYamlGetVersion(pubspecYaml);
-
+  stdout.writeln('Current version: $version');
   if (!patch && !minor && !major && !ext) {
     if (version.isPreRelease || version.build.isNotEmpty) {
       ext = true;
@@ -31,7 +31,8 @@ Future<void> pathVersionBump(
     version = version.nextMinor;
   } else if (major) {
     version = version.nextMajor;
-  } else if (ext) {
+  }
+  if (ext) {
     version = version.nextPreReleaseOrBuild;
   }
   stdout.writeln('New version: $version');
