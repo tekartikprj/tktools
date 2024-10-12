@@ -45,6 +45,11 @@ dependencies:
       ref: dart3a
   yaml: '>=3.1.2'
   yaml_edit: '>=0.2.0'
+  tekartik_prefs:
+    git:
+      url: https://github.com/tekartik/prefs.dart
+      ref: dart3a
+      path: prefs
 
 dev_dependencies:
   lints: '>=4.0.0'

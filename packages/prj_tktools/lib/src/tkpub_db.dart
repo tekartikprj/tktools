@@ -55,8 +55,8 @@ class ConfigDb {
   }
 
   /// Get a package
-  Future<TkPubDbPackage> getPackage(String id) async {
-    var package = await getPackageOrNull(id);
+  Future<TkPubDbPackage> getPackage(String id, {bool? addMissingRef}) async {
+    var package = await getPackageOrNull(id, addMissingRef: addMissingRef);
     if (package == null) {
       throw StateError('Package not found $id');
     }
@@ -64,20 +64,31 @@ class ConfigDb {
   }
 
   /// Get a package or null
-  Future<TkPubDbPackage?> getPackageOrNull(String id) async {
+  Future<TkPubDbPackage?> getPackageOrNull(String id,
+      {bool? addMissingRef}) async {
     var package = await tkPubPackagesStore.record(id).get(db);
     if (package == null) {
       return null;
     }
-    if (package.gitRef.isNull) {
-      var defaultRef = await tkPubConfigRefRecord.get(db);
-      package.gitRef.v = defaultRef?.gitRef.v;
+    if (addMissingRef ?? false) {
+      if (package.gitRef.isNull) {
+        var defaultRef = await tkPubConfigRefRecord.get(db);
+        package.gitRef.v = defaultRef?.gitRef.v;
+      }
     }
     return package;
   }
 
   /// Constructor
-  ConfigDb(this.db);
+  ConfigDb(this.db) {
+    cvAddConstructor(TkPubDbPackage.new);
+    cvAddConstructor(DbConfigRef.new);
+  }
+
+  /// Close the db
+  Future<void> close() async {
+    await db.close();
+  }
 }
 
 /// Open the prefs
@@ -109,8 +120,6 @@ Future<Database> _tkpubDbOpen({String? configExportPath}) async {
     if (configExportPath == null) {
       throw StateError('Not intialized, call tkpub_init first');
     } else {
-      cvAddConstructor(TkPubDbPackage.new);
-      cvAddConstructor(DbConfigRef.new);
       _configExportPath = configExportPath;
       _initialized = true;
     }

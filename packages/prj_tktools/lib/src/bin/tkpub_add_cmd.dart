@@ -206,7 +206,8 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
           var packageName = info.name;
           // True for add only!
           //var packageHasDefinition = packageName != packageNameOrDef;
-          var package = await db.getPackageOrNull(packageName);
+          var package =
+              await db.getPackageOrNull(packageName, addMissingRef: true);
 
           var pubspecOverrides = info.target == TkPubTarget.pubspecOverrides ||
               (info.target == null && globalPubspecOverrides);
