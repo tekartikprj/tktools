@@ -6,7 +6,6 @@ import 'package:pool/pool.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
-import 'package:tekartik_common_utils/env_utils.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_git_config_db.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_status_db.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart';
@@ -38,6 +37,7 @@ abstract class DtkActionRunner<T extends DbDtkAction> {
 
   /// find main action
   Future<T> findMainAction({bool noReport = false}) async {
+    await _init();
     var dbAction = await db.findOrCreateAction<T>(action);
     if (dbAction.status.v == actionResultOk) {
       if (!noReport) {
@@ -45,6 +45,13 @@ abstract class DtkActionRunner<T extends DbDtkAction> {
       }
     }
     return dbAction;
+  }
+
+  /// Init once
+  Future<void> _init() async {
+    var concurrency = (await db.getExecutionConcurrency() ?? 1);
+    // print('concurrency: $concurrency');
+    _poolOrNull ??= Pool(concurrency);
   }
 
   /// constructor
@@ -107,7 +114,8 @@ class DtkDartProjectActionRunner
 }
 
 /// ! (might need decrease)
-var _pool = Pool(Platform.isLinux || Platform.isMacOS ? 50 : 1);
+Pool _pool = Pool(Platform.isLinux || Platform.isMacOS ? 50 : 1);
+Pool? _poolOrNull;
 
 /// dtk find dart project action runner
 class DtkFindDartProjectActionRunner
@@ -315,8 +323,14 @@ void dtkMenu() {
         var url = await prompt('url');
         if (url != null) {
           await dtkGitConfigDbAction((db) async {
-            var repository = DbDtkGitRepository()..gitUrl.v = url;
-            var repo = await db.setRepository(repository);
+            var id = dtkGitUniqueNameFromUrl(url);
+            var repo = await db.getRepositoryOrNull(id);
+            if (repo != null) {
+              write('already exists $repo');
+            }
+            repo ??= DbDtkGitRepository();
+            repo.gitUrl.v = url;
+            repo = await db.setRepository(repo);
             write(repo);
           }, write: true);
         }
@@ -338,6 +352,24 @@ void dtkMenu() {
             var repo = await db.deleteRepository(id);
             write(repo);
           }, write: true);
+        }
+      });
+    });
+    menu('execution', () async {
+      item('get', () async {
+        var config = await dbDtkExecutionConfigRecord.get(db.db);
+        write(config);
+      });
+      item('set concurrency (prompt)', () async {
+        var config = await dbDtkExecutionConfigRecord.get(db.db);
+        write(config);
+        var concurrency = parseInt(await prompt('concurrency'));
+        if (concurrency != null) {
+          config ??= DbDtkExecutionConfig();
+          config.concurrency.v = concurrency;
+          config = await dbDtkExecutionConfigRecord.put(db.db, config);
+          write(config);
+          _poolOrNull = null;
         }
       });
     });

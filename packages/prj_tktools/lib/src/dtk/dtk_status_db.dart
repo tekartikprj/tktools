@@ -21,6 +21,15 @@ class DbDtkStatusConfig extends DbStringRecordBase {
   CvFields get fields => [currentTimepoint];
 }
 
+/// Executation config
+class DbDtkExecutionConfig extends DbStringRecordBase {
+  /// Concurrency
+  final concurrency = CvField<int>('concurrency');
+
+  @override
+  CvFields get fields => [concurrency];
+}
+
 /// Not tried yet
 const actionResultNone = 'none';
 
@@ -122,6 +131,7 @@ class DtkStatusDb {
       DbDtkActionFindRepos.new,
       DbDtkActionFindDartProject.new,
       DbDtkActionPubUpgrade.new,
+      DbDtkExecutionConfig.new,
     ]);
     cvAddBuilder<DbDtkAction>((map) {
       var action = map[dbDtkActionModel.action.name] as String;
@@ -136,6 +146,14 @@ class DtkStatusDb {
           return DbDtkAction();
       }
     });
+  }
+
+  /// Get the exception concurrency
+  Future<int?> getExecutionConcurrency() async {
+    return (await db.transaction((txn) async {
+      var config = await dbDtkExecutionConfigRecord.get(txn);
+      return config?.concurrency.v;
+    }));
   }
 
   CvQueryRef<int, DbDtkTimepoint> get _timepointQueryRef =>
@@ -387,3 +405,7 @@ var dbDtkStatusConfigStore =
 
 /// Config record
 var dbDtkStatusConfigRecord = dbDtkStatusConfigStore.record('config');
+
+/// Config record
+var dbDtkExecutionConfigRecord =
+    dbDtkStatusConfigStore.castV<DbDtkExecutionConfig>().record('execution');
