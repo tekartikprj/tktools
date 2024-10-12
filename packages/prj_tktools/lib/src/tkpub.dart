@@ -1,5 +1,16 @@
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart';
+import 'package:tekartik_prj_tktools/tkreg.dart';
+
+/// Prefs key for the git export path
+const tkPubExportPathGlobalPrefsKey = 'com.tekartik.tkpub.pubExportPath';
+
+/// Get config export path
+Future<String?> tkPubGetConfigExportPath() async {
+  var prefs = await openGlobalPrefsPrefs();
+  var path = prefs.getString(tkPubExportPathGlobalPrefsKey);
+  return path;
+}
 
 /// Get local path
 Future<String> tkPubGetPackageLocalPath(
@@ -9,11 +20,4 @@ Future<String> tkPubGetPackageLocalPath(
       githubTop: githubTop,
       gitUrl: dbPackage.gitUrl.v!,
       gitPath: dbPackage.gitPath.v);
-}
-
-/// Get config export path
-Future<String?> tkPubGetConfigExportPath() async {
-  var prefs = await openPrefs();
-  var configExportPath = prefs.getString(prefsKeyConfigExportPath);
-  return configExportPath;
 }

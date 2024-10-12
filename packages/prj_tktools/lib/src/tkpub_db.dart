@@ -4,6 +4,7 @@ import 'package:sembast/sembast_memory.dart';
 import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
+import 'package:tekartik_prj_tktools/src/tkpub.dart';
 
 /// path prefs key.
 const prefsKeyConfigExportPath = 'path';
@@ -113,8 +114,7 @@ var _initialized = false;
 Future<Database> _tkpubDbOpen({String? configExportPath}) async {
   if (!_initialized) {
     configExportPath ??= await () async {
-      var prefs = await openPrefs();
-      return prefs.getString(prefsKeyConfigExportPath);
+      return await tkPubGetConfigExportPath();
     }();
 
     if (configExportPath == null) {
@@ -161,4 +161,12 @@ Future<T> tkPubDbAction<T>(Future<T> Function(ConfigDb db) action,
       await db.close();
     }
   }
+}
+
+/// Get all packages
+Future<List<TkPubDbPackage>> tkPubGetAllPackages() async {
+  return await tkPubDbAction((db) async {
+    var packages = await tkPubPackagesStore.query().getRecords(db.db);
+    return packages;
+  });
 }

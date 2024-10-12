@@ -2,7 +2,13 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:tekartik_common_utils/string_utils.dart';
+import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
+
+/// Find git top path
+Future<String> tkPubFindGitTop({String? dirPath}) async {
+  return dirname(await tkPubFindGithubTop(dirPath: dirPath));
+}
 
 /// Find tekartik github top
 Future<String> tkPubFindGithubTop({String? dirPath}) async {
@@ -16,6 +22,7 @@ Future<String> tkPubFindGithubTop({String? dirPath}) async {
   if (dir != null) {
     return dir;
   }
+  // Find from tkpub
   var prefs = await openPrefs();
   var prefsPath = prefs.getString(prefsKeyConfigExportPath);
   if (prefsPath != null) {
@@ -24,6 +31,15 @@ Future<String> tkPubFindGithubTop({String? dirPath}) async {
       return dir;
     }
   }
+  // Find from dtk
+  var dtkTop = await dtkGetGitExportPath();
+  if (dtkTop != null) {
+    var dir = _findGithubTopOrNull(dtkTop);
+    if (dir != null) {
+      return dir;
+    }
+  }
+
   throw StateError('Cannot find top github.com dir');
 }
 

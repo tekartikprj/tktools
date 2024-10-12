@@ -6,7 +6,8 @@ const dtkGitExportPathGlobalPrefsKey = 'com.tekartik.dtk.gitExportPath';
 /// Get git export path
 Future<String?> dtkGetGitExportPath() async {
   var prefs = await openGlobalPrefsPrefs();
-  return prefs.getString(dtkGitExportPathGlobalPrefsKey);
+  var path = prefs.getString(dtkGitExportPathGlobalPrefsKey);
+  return path;
 }
 
 /// Get git unique name from url

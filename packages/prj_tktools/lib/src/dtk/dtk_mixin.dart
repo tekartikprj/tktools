@@ -1,3 +1,4 @@
+export '../tkpub_db.dart' show tkPubGetAllPackages;
 export 'dtk.dart';
 export 'dtk_git_config_db.dart';
 export 'dtk_menu.dart';

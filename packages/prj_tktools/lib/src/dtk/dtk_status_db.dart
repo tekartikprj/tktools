@@ -21,6 +21,27 @@ class DbDtkStatusConfig extends DbStringRecordBase {
   CvFields get fields => [currentTimepoint];
 }
 
+/// Not tried yet
+const actionResultNone = 'none';
+
+/// KO
+const actionResultKo = 'ko';
+
+/// Ok result
+const actionResultOk = 'ok';
+
+/// dtk action runner
+const actionFindDartProjects = 'findDartProjects';
+
+/// Find repos action
+const actionFindRepos = 'findRepos';
+
+/// Pub upgrade action
+const actionPubUpgrade = 'pubUpgrade';
+
+/// Pub upgrade action
+const actionAnalyze = 'analyze';
+
 /// Action
 class DbDtkAction extends DbIntRecordBase {
   /// Associated timepoint
@@ -32,11 +53,51 @@ class DbDtkAction extends DbIntRecordBase {
   /// action
   final action = CvField<String>('action');
 
-  /// result
-  final result = CvField<String>('result');
+  /// Main action
+  final main = CvField<bool>('main');
+
+  /// status (none, ok, ko)
+  final status = CvField<String>('status');
   @override
-  CvFields get fields => [timepoint, timestamp, action, result];
+  CvFields get fields => [timepoint, timestamp, action, status, main];
 }
+
+/// model
+final dbDtkActionModel = DbDtkAction();
+
+/// Find repos action
+class DbDtkActionFindRepos extends DbDtkAction {
+  /// gitHubTop
+  final gitTop = CvField<String>('gitTop');
+
+  /// Repos
+  final repos = CvListField<String>('repos');
+  @override
+  CvFields get fields => [...super.fields, gitTop, repos];
+}
+
+/// Find repos action
+class DbDtkActionFindDartProject extends DbDtkAction {
+  /// repo
+  final repo = CvField<String>('repo');
+
+  /// Dart projects
+  final dartProjects = CvListField<String>('dartProjects');
+  @override
+  CvFields get fields => [...super.fields, repo, dartProjects];
+}
+
+/// Find repos action
+class DbDtkActionPubUpgrade extends DbDtkAction {
+  /// repo/dartProjectPath
+  final path = CvField<String>('path');
+
+  @override
+  CvFields get fields => [...super.fields, path];
+}
+
+/// Model
+final dbDtkActionFindDartProjectModel = DbDtkActionFindDartProject();
 
 /// The model
 final dbDtkTimepointModel = DbDtkTimepoint();
@@ -55,7 +116,26 @@ class DtkStatusDb {
 
   /// Create a DtkGitStatusDb
   DtkStatusDb(this.db) {
-    cvAddConstructors([DbDtkTimepoint.new, DbDtkStatusConfig.new]);
+    cvAddConstructors([
+      DbDtkTimepoint.new,
+      DbDtkStatusConfig.new,
+      DbDtkActionFindRepos.new,
+      DbDtkActionFindDartProject.new,
+      DbDtkActionPubUpgrade.new,
+    ]);
+    cvAddBuilder<DbDtkAction>((map) {
+      var action = map[dbDtkActionModel.action.name] as String;
+      switch (action) {
+        case actionFindRepos:
+          return DbDtkActionFindRepos();
+        case actionFindDartProjects:
+          return DbDtkActionFindDartProject();
+        case actionPubUpgrade:
+          return DbDtkActionPubUpgrade();
+        default:
+          return DbDtkAction();
+      }
+    });
   }
 
   CvQueryRef<int, DbDtkTimepoint> get _timepointQueryRef =>
@@ -65,6 +145,121 @@ class DtkStatusDb {
       ]));
   Future<DbDtkTimepoint?> _getLastTimepoint(Transaction txn) async {
     return await _timepointQueryRef.getRecord(txn);
+  }
+
+  Future<DbDtkTimepoint> _getOrCreateLastTimepoint(Transaction txn,
+      {Timestamp? now}) async {
+    return await _timepointQueryRef.getRecord(txn) ??
+        _createTimepoint(txn, now: now);
+  }
+
+  /// Find when done for sub task
+  Future<DbDtkActionFindRepos> getFindReposAction() async {
+    return (await findAction<DbDtkActionFindRepos>(actionFindRepos))!;
+  }
+
+  /// Find when done for sub task
+  Future<DbDtkActionFindDartProject> getFindDartProjectAction(
+      {required String repo}) async {
+    return (await findAction<DbDtkActionFindDartProject>(actionFindDartProjects,
+        model: DbDtkActionFindDartProject()..repo.v = repo))!;
+  }
+
+  /// Find actions
+  Future<T?> findAction<T extends DbDtkAction>(String action,
+      {T? model}) async {
+    return await db.transaction((txn) async {
+      var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
+      Filter? filter;
+      if (model != null) {
+        filter = _filterFromModel(model as DbDtkAction);
+      }
+      return (await _findActions<T>(txn, timepointId, action, filter: filter))
+          .firstOrNull;
+    });
+  }
+
+  Future<T> _createAction<T extends DbDtkAction>(
+      Transaction txn, int timepointId, String action,
+      {required bool main, T? model}) async {
+    var newAction = cvNewModel<T>()
+      ..action.v = action
+      ..timepoint.v = timepointId
+      ..timestamp.v = Timestamp.now()
+      ..status.v = actionResultNone
+      ..main.v = main;
+    if (model != null) {
+      /// Copy fields
+      for (var field in model.fields) {
+        if (field.hasValue) {
+          newAction.field(field.name)?.setValue(field.v);
+        }
+      }
+    }
+
+    return await dbDtkActionStore.castV<T>().add(txn, newAction);
+  }
+
+  Filter? _filterFromModel<T extends DbDtkAction>(T model) {
+    var filters = <Filter>[];
+
+    /// equality on fields
+    for (var field in model.fields) {
+      if (field.hasValue) {
+        filters.add(Filter.equals(field.name, field.v));
+      }
+    }
+    if (filters.isNotEmpty) {
+      return Filter.and(filters);
+    }
+    return null;
+  }
+
+  /// Find or create action
+  Future<T> findOrCreateAction<T extends DbDtkAction>(String action,
+      {Filter? filter, T? model}) async {
+    return await db.transaction((txn) async {
+      var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
+
+      if (model != null) {
+        filter = _filterFromModel(model);
+      }
+      var foundAction =
+          (await _findActions<T>(txn, timepointId, action, filter: filter))
+              .firstOrNull;
+
+      return foundAction ??
+          _createAction<T>(txn, timepointId, action,
+              main: filter == null && model == null, model: model);
+    });
+  }
+
+  /// Find actions
+  Future<List<T>> findActions<T extends DbDtkAction>(String action) async {
+    return await db.transaction((txn) async {
+      var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
+      return await _findActions(txn, timepointId, action);
+    });
+  }
+
+  /// Find actions
+  Future<List<T>> _findActions<T extends DbDtkAction>(
+      Transaction txn, int timepointId, String action,
+      {Filter? filter}) async {
+    var actions = await dbDtkActionStore
+        .castV<T>()
+        .query(
+            finder: Finder(
+                filter: Filter.and([
+          Filter.equals(dbDtkActionModel.timepoint.name, timepointId),
+          Filter.equals(dbDtkActionModel.action.name, action),
+          if (filter != null)
+            filter
+          else
+            Filter.equals(dbDtkActionModel.main.name, true),
+        ])))
+        .getRecords(txn);
+    return actions;
   }
 
   /// Get the current timepoint
@@ -110,12 +305,18 @@ class DtkStatusDb {
   /// Delete a Repository
   Future<DbDtkTimepoint> createTimepoint({Timestamp? now}) async {
     return await db.transaction((txn) async {
-      now ??= Timestamp.now();
-      var record = DbDtkTimepoint()..timestamp.v = now;
-      var timepoint = await dbDtkTimepointStore.add(txn, record);
-      await _setCurrentTimepointId(txn, timepoint.id);
-      return timepoint;
+      return await _createTimepoint(txn, now: now);
     });
+  }
+
+  /// Delete a Repository
+  Future<DbDtkTimepoint> _createTimepoint(Transaction txn,
+      {Timestamp? now}) async {
+    now ??= Timestamp.now();
+    var record = DbDtkTimepoint()..timestamp.v = now;
+    var timepoint = await dbDtkTimepointStore.add(txn, record);
+    await _setCurrentTimepointId(txn, timepoint.id);
+    return timepoint;
   }
 
   /// Get all timepoints
@@ -176,6 +377,9 @@ class DtkStatusDb {
 
 /// Repository store
 var dbDtkTimepointStore = cvIntRecordFactory.store<DbDtkTimepoint>('timepoint');
+
+/// action store
+var dbDtkActionStore = cvIntRecordFactory.store<DbDtkAction>('action');
 
 /// Config store
 var dbDtkStatusConfigStore =
