@@ -110,6 +110,7 @@ class DtkDartProjectActionRunner
     await Future.wait(futures);
     mainAction.status.v = actionResultOk;
     await mainAction.put(db.db);
+    stdout.writeln('action $action done');
   }
 }
 
@@ -158,6 +159,7 @@ class DtkFindDartProjectActionRunner
     }
     findDartProjectMainAction.status.v = actionResultOk;
     await findDartProjectMainAction.put(db.db);
+    stdout.writeln('action $action done');
   }
 }
 
@@ -198,6 +200,7 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
 
     /// put
     await findRepoAction.put(db.db);
+    stdout.writeln('action $action done');
   }
 }
 
