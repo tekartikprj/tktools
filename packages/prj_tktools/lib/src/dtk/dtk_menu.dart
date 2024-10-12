@@ -178,9 +178,9 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
       var path = join(gitTop, repoPath);
       if (Directory(path).existsSync()) {
         foundRepos.add(repoPath);
-        // write('found $path');
+        write('found repo $path');
       } else {
-        // write('not found $path');
+        write('repo not found at $path');
       }
     }
 
@@ -206,9 +206,7 @@ void dtkMenu() {
         write('${item.id} ${item.toMap()}');
       }
     });
-    item('clear actions', () async {
-      await dbDtkActionStore.delete(db.db);
-    });
+
     item('findRepos', () async {
       await DtkFindReposActionRunner(db).run();
     });
@@ -224,6 +222,28 @@ void dtkMenu() {
     item('pubUpgrade && analyze', () async {
       await DtkDartProjectActionRunner(db, action: actionPubUpgrade).run();
       await DtkDartProjectActionRunner(db, action: actionAnalyze).run();
+    });
+    menu('clear', () async {
+      item('clear actions', () async {
+        await dbDtkActionStore.delete(db.db);
+      });
+      for (var action in [
+        actionFindDartProjects,
+        actionFindRepos,
+        actionPubUpgrade,
+        actionAnalyze
+      ]) {
+        item('clear action $action', () async {
+          await dbDtkActionStore.delete(db.db,
+              finder: Finder(
+                  filter: Filter.equals(dbDtkActionModel.action.name, action)));
+        });
+      }
+      item('clear main actions', () async {
+        await dbDtkActionStore.delete(db.db,
+            finder: Finder(
+                filter: Filter.equals(dbDtkActionModel.main.name, true)));
+      });
     });
   });
   menu('config', () {
@@ -285,17 +305,39 @@ void dtkMenu() {
       });
     });
     menu('repository', () {
-      if (isDebug) {}
-      item('add', () async {
-        var url = await prompt('url');
-        if (url != null) {
-          await dtkGitConfigDbAction((db) async {}, write: true);
-        }
-      });
       item('list', () async {
         var list = await dtkGitGetAllRepositories();
         for (var item in list) {
           write('${item.id} ${item.toMap()}');
+        }
+      });
+      item('add (prompt)', () async {
+        var url = await prompt('url');
+        if (url != null) {
+          await dtkGitConfigDbAction((db) async {
+            var repository = DbDtkGitRepository()..gitUrl.v = url;
+            var repo = await db.setRepository(repository);
+            write(repo);
+          }, write: true);
+        }
+      });
+      item('delete by url (prompt)', () async {
+        var url = await prompt('url');
+        if (url != null) {
+          await dtkGitConfigDbAction((db) async {
+            var id = dtkGitUniqueNameFromUrl(url);
+            var repo = await db.deleteRepository(id);
+            write(repo);
+          }, write: true);
+        }
+      });
+      item('delete by id (prompt)', () async {
+        var id = await prompt('id');
+        if (id != null) {
+          await dtkGitConfigDbAction((db) async {
+            var repo = await db.deleteRepository(id);
+            write(repo);
+          }, write: true);
         }
       });
     });
