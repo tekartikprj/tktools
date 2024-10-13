@@ -322,6 +322,24 @@ void dtkMenu() {
           write('${item.id} ${item.toMap()}');
         }
       });
+      item('add by unique name (prompt)', () async {
+        var id = await prompt(
+            'unique name (example: github.com/tekartik/app_common_utils.dart)');
+        if (id != null) {
+          await dtkGitConfigDbAction((db) async {
+            var repo = await db.getRepositoryOrNull(id);
+            if (repo != null) {
+              write('already exists $repo');
+              write(repo);
+              return;
+            }
+            repo = DbDtkGitRepository()
+              ..ref = dtkGitDbRepositoryStore.record(id);
+            repo = await db.setRepository(repo);
+            write(repo);
+          }, write: true);
+        }
+      });
       item('add (prompt)', () async {
         var url = await prompt('url');
         if (url != null) {
