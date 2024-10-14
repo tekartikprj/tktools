@@ -8,8 +8,11 @@ class DbDtkTimepoint extends DbIntRecordBase {
   /// timestamp
   final timestamp = CvField<Timestamp>('timestamp');
 
+  /// tag filter
+  final tagFilter = CvField<String>('tagFilter');
+
   @override
-  CvFields get fields => [timestamp];
+  CvFields get fields => [timestamp, tagFilter];
 }
 
 /// Db status config
@@ -17,8 +20,11 @@ class DbDtkStatusConfig extends DbStringRecordBase {
   /// Current timepoint
   final currentTimepoint = CvField<int>('currentTimepoint');
 
+  /// Default filter tag
+  final defaultTagFilter = CvField<String>('defaultTagFilter');
+
   @override
-  CvFields get fields => [currentTimepoint];
+  CvFields get fields => [currentTimepoint, defaultTagFilter];
 }
 
 /// Executation config
@@ -154,6 +160,28 @@ class DtkStatusDb {
       var config = await dbDtkExecutionConfigRecord.get(txn);
       return config?.concurrency.v;
     }));
+  }
+
+  /// Get config
+  Future<DbDtkStatusConfig?> getConfig() async {
+    return await db.transaction((txn) async {
+      var config = await _getConfig(txn);
+      return config;
+    });
+  }
+
+  /// Get config
+  Future<DbDtkStatusConfig?> _getConfig(Transaction txn) async {
+    var config = await dbDtkStatusConfigRecord.get(txn);
+    return config;
+  }
+
+  /// Set config
+  Future<DbDtkStatusConfig> setConfig(DbDtkStatusConfig config) async {
+    return await db.transaction((txn) async {
+      var newConfig = await dbDtkStatusConfigRecord.put(txn, config);
+      return newConfig;
+    });
   }
 
   CvQueryRef<int, DbDtkTimepoint> get _timepointQueryRef =>
@@ -321,17 +349,20 @@ class DtkStatusDb {
   }
 
   /// Delete a Repository
-  Future<DbDtkTimepoint> createTimepoint({Timestamp? now}) async {
+  Future<DbDtkTimepoint> createTimepoint(
+      {Timestamp? now, String? tagFilter}) async {
     return await db.transaction((txn) async {
-      return await _createTimepoint(txn, now: now);
+      return await _createTimepoint(txn, now: now, tagFilter: tagFilter);
     });
   }
 
   /// Delete a Repository
   Future<DbDtkTimepoint> _createTimepoint(Transaction txn,
-      {Timestamp? now}) async {
+      {Timestamp? now, String? tagFilter}) async {
     now ??= Timestamp.now();
-    var record = DbDtkTimepoint()..timestamp.v = now;
+    var record = DbDtkTimepoint()
+      ..timestamp.v = now
+      ..tagFilter.v = tagFilter;
     var timepoint = await dbDtkTimepointStore.add(txn, record);
     await _setCurrentTimepointId(txn, timepoint.id);
     return timepoint;

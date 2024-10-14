@@ -3,6 +3,7 @@ import 'package:process_run/stdio.dart';
 import 'package:sembast/sembast_memory.dart';
 import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
+import 'package:tekartik_common_utils/tags.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
 
 /// Db config ref
@@ -22,14 +23,48 @@ class DbDtkGitRepository extends DbStringRecordBase {
   /// ref (optional, default to config)
   final gitRef = CvField<String>('gitRef');
 
+  /// tags (public, main, project specific)
+  final tags = CvListField<String>('tags');
   @override
-  CvFields get fields => [gitUrl, gitRef];
+  CvFields get fields => [gitUrl, gitRef, tags];
+}
+
+/// Extension
+extension DbDtkGitRepositoryExt on DbDtkGitRepository {
+  /// Add a tag, returns [true] if added, [false] if already there
+  bool addTag(String tag) {
+    var tags = Tags.fromList(this.tags.v);
+    if (tags.add(tag)) {
+      this.tags.v = (tags..sort()).toListOrNull();
+      return true;
+    }
+    return false;
+  }
+
+  /// Remove a tag, returns [true] if removed, [false] if not there
+  bool removeTag(String tag) {
+    var tags = Tags.fromList(this.tags.v);
+    if (tags.remove(tag)) {
+      // No need to sort
+      this.tags.v = tags.toListOrNull();
+      return true;
+    }
+    return false;
+  }
+
+  /// Get the unique name from the git url
+  String get uniqueName => dtkGitUniqueNameFromUrl(gitUrl.v!);
 }
 
 /// Config database.
 class DtkGitConfigDb {
-  /// the sembase db
+  /// the sembast db
   final Database db;
+
+  /// Get all repositories
+  Future<List<DbDtkGitRepository>> getAllRepositories() async {
+    return await dtkGitDbRepositoryStore.query().getRecords(db);
+  }
 
   /// Delete a Repository
   Future<bool> deleteRepository(String id) async {
@@ -144,8 +179,16 @@ Future<T> dtkGitConfigDbAction<T>(Future<T> Function(DtkGitConfigDb db) action,
 }
 
 /// Get all repositories
-Future<List<DbDtkGitRepository>> dtkGitGetAllRepositories() async {
+Future<List<DbDtkGitRepository>> dtkGitGetAllRepositories(
+    {String? tagFilter}) async {
   return await dtkGitConfigDbAction((db) async {
-    return dtkGitDbRepositoryStore.query().getRecords(db.db);
+    var allRepos = await dtkGitDbRepositoryStore.query().getRecords(db.db);
+    if (tagFilter != null) {
+      var tagsCondition = TagsCondition(tagFilter);
+      allRepos = allRepos
+          .where((repo) => tagsCondition.check(Tags.fromList(repo.tags.v)))
+          .toList();
+    }
+    return allRepos;
   });
 }

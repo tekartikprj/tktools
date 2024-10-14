@@ -5,7 +5,7 @@ import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
-import 'package:tekartik_prj_tktools/tkpub_db.dart';
+import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 
 /// git url option
 const optionGitUrl = 'git-url';

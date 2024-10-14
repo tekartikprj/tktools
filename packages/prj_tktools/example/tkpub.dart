@@ -1,4 +1,4 @@
-import 'package:tekartik_prj_tktools/tkpub_bin.dart';
+import 'package:tekartik_prj_tktools/tkpub.dart';
 
 /// tkpub
 /// tkpub config set tekartik_script --git-url git@github.com:alextekartik/script.dart --git-path packages/script

@@ -6,6 +6,8 @@ import 'package:pool/pool.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
+import 'package:tekartik_common_utils/string_utils.dart';
+import 'package:tekartik_common_utils/tags.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_git_config_db.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_status_db.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart';
@@ -181,7 +183,10 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
     var gitTop = await tkPubFindGitTop();
     findRepoAction.gitTop.v = gitTop;
 
-    var repos = await dtkGitGetAllRepositories();
+    var timepoint = await db.getCurrentTimepoint();
+    stdout.writeln('timepoint: $timepoint');
+    var repos =
+        await dtkGitGetAllRepositories(tagFilter: timepoint?.tagFilter.v);
     var foundRepos = <String>[];
     for (var repo in repos) {
       var repoPath = repo.id;
@@ -258,9 +263,41 @@ void dtkMenu() {
     });
   });
   menu('config', () {
+    item('get config', () async {
+      var config = await db.getConfig();
+      write(config);
+    });
+    menu('tag filter', () {
+      item('get default tag filter', () async {
+        var config = await db.getConfig();
+        write(config);
+      });
+      item('set default tag filter (prompt)', () async {
+        var config = await db.getConfig();
+        write(config);
+        var tagFilter = await prompt('default tag filter');
+        if (tagFilter != null) {
+          config ??= DbDtkStatusConfig();
+          config.defaultTagFilter.v =
+              TagsCondition(tagFilter).toText().nonEmpty();
+          config = await db.setConfig(config);
+          write(config);
+        }
+      });
+    });
     menu('timepoint', () {
       item('add timepoint', () async {
-        var timepoint = await db.createTimepoint();
+        var defaultTagFilter =
+            (await db.getConfig())?.defaultTagFilter.v?.nonEmpty() ?? '*';
+        var tagFilter =
+            await prompt('tag filter (default: $defaultTagFilter, * for all)');
+        if (tagFilter?.nonEmpty() == null) {
+          tagFilter = defaultTagFilter;
+        }
+        if (tagFilter == '*') {
+          tagFilter = null;
+        }
+        var timepoint = await db.createTimepoint(tagFilter: tagFilter);
         write(timepoint);
       });
       Future<void> listTimepoints() async {
@@ -325,16 +362,26 @@ void dtkMenu() {
       item('add by unique name (prompt)', () async {
         var id = await prompt(
             'unique name (example: github.com/tekartik/app_common_utils.dart)');
-        if (id != null) {
+        if (id?.nonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
-            var repo = await db.getRepositoryOrNull(id);
+            var repo = await db.getRepositoryOrNull(id!);
+
             if (repo != null) {
               write('already exists $repo');
               write(repo);
-              return;
+
+              if (await prompt('update tags y/n') != 'y') {
+                return;
+              }
             }
-            repo = DbDtkGitRepository()
+            repo ??= DbDtkGitRepository()
               ..ref = dtkGitDbRepositoryStore.record(id);
+
+            var tags = await prompt('tags');
+            if (tags?.nonEmpty() != null) {
+              repo.tags.v = Tags.fromText(tags).toListOrNull();
+            }
+
             repo = await db.setRepository(repo);
             write(repo);
           }, write: true);
@@ -368,9 +415,9 @@ void dtkMenu() {
       });
       item('delete by id (prompt)', () async {
         var id = await prompt('id');
-        if (id != null) {
+        if (id?.nonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
-            var repo = await db.deleteRepository(id);
+            var repo = await db.deleteRepository(id!);
             write(repo);
           }, write: true);
         }

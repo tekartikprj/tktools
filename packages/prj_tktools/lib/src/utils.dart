@@ -1,17 +1,33 @@
 import 'dart:io';
 
 import 'package:path/path.dart';
+import 'package:process_run/process_run.dart';
 import 'package:tekartik_common_utils/string_utils.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 
+const _tekartikGitTopEnvKey = 'TEKARTIK_GIT_TOP';
+
 /// Find git top path
 Future<String> tkPubFindGitTop({String? dirPath}) async {
-  return dirname(await tkPubFindGithubTop(dirPath: dirPath));
+  var envGitTop = shellEnvironment[_tekartikGitTopEnvKey];
+  if (envGitTop != null) {
+    return envGitTop;
+  }
+  var gihubTop = await _tkPubFindGithubTopOrNull(dirPath: dirPath);
+  if (gihubTop != null) {
+    return dirname(gihubTop);
+  }
+  throw StateError('Cannot find top git dir, set $_tekartikGitTopEnvKey');
 }
 
 /// Find tekartik github top
 Future<String> tkPubFindGithubTop({String? dirPath}) async {
+  return (await _tkPubFindGithubTopOrNull(dirPath: dirPath))!;
+}
+
+/// Find tekartik github top
+Future<String?> _tkPubFindGithubTopOrNull({String? dirPath}) async {
   if (dirPath != null) {
     var dir = _findGithubTopOrNull(dirPath);
     if (dir != null) {
