@@ -274,15 +274,21 @@ void dtkMenu() {
       });
       item('set default tag filter (prompt)', () async {
         var config = await db.getConfig();
-        write(config);
-        var tagFilter = await prompt('default tag filter');
-        if (tagFilter != null) {
-          config ??= DbDtkStatusConfig();
-          config.defaultTagFilter.v =
-              TagsCondition(tagFilter).toText().nonEmpty();
-          config = await db.setConfig(config);
-          write(config);
+        var defaultTagFilter = config?.defaultTagFilter.v?.nonEmpty() ?? '*';
+        var tagFilter = await prompt(
+            'default tag filter (default: $defaultTagFilter, * for all)');
+        if (tagFilter.nonEmpty() == null) {
+          tagFilter = defaultTagFilter;
         }
+        if (tagFilter == '*') {
+          tagFilter = '';
+        }
+
+        config ??= DbDtkStatusConfig();
+        config.defaultTagFilter.v =
+            TagsCondition(tagFilter).toText().nonEmpty();
+        config = await db.setConfig(config);
+        write(config);
       });
     });
     menu('timepoint', () {
@@ -291,13 +297,14 @@ void dtkMenu() {
             (await db.getConfig())?.defaultTagFilter.v?.nonEmpty() ?? '*';
         var tagFilter =
             await prompt('tag filter (default: $defaultTagFilter, * for all)');
-        if (tagFilter?.nonEmpty() == null) {
+        if (tagFilter.nonEmpty() == null) {
           tagFilter = defaultTagFilter;
         }
         if (tagFilter == '*') {
-          tagFilter = null;
+          tagFilter = '';
         }
-        var timepoint = await db.createTimepoint(tagFilter: tagFilter);
+        var timepoint =
+            await db.createTimepoint(tagFilter: tagFilter.nonEmpty());
         write(timepoint);
       });
       Future<void> listTimepoints() async {
@@ -362,9 +369,9 @@ void dtkMenu() {
       item('add by unique name (prompt)', () async {
         var id = await prompt(
             'unique name (example: github.com/tekartik/app_common_utils.dart)');
-        if (id?.nonEmpty() != null) {
+        if (id.nonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
-            var repo = await db.getRepositoryOrNull(id!);
+            var repo = await db.getRepositoryOrNull(id);
 
             if (repo != null) {
               write('already exists $repo');
@@ -378,7 +385,7 @@ void dtkMenu() {
               ..ref = dtkGitDbRepositoryStore.record(id);
 
             var tags = await prompt('tags');
-            if (tags?.nonEmpty() != null) {
+            if (tags.nonEmpty() != null) {
               repo.tags.v = Tags.fromText(tags).toListOrNull();
             }
 
@@ -389,7 +396,7 @@ void dtkMenu() {
       });
       item('add (prompt)', () async {
         var url = await prompt('url');
-        if (url != null) {
+        if (url.trimmedNonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
             var id = dtkGitUniqueNameFromUrl(url);
             var repo = await db.getRepositoryOrNull(id);
@@ -405,7 +412,7 @@ void dtkMenu() {
       });
       item('delete by url (prompt)', () async {
         var url = await prompt('url');
-        if (url != null) {
+        if (url.trimmedNonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
             var id = dtkGitUniqueNameFromUrl(url);
             var repo = await db.deleteRepository(id);
@@ -415,9 +422,9 @@ void dtkMenu() {
       });
       item('delete by id (prompt)', () async {
         var id = await prompt('id');
-        if (id?.nonEmpty() != null) {
+        if (id.trimmedNonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
-            var repo = await db.deleteRepository(id!);
+            var repo = await db.deleteRepository(id);
             write(repo);
           }, write: true);
         }
@@ -451,7 +458,7 @@ void dtkMenu() {
         var prefs = await openGlobalPrefsPrefs();
         write(prefs.getString(dtkGitExportPathGlobalPrefsKey));
         var exportPath = await prompt('export path');
-        if (exportPath != null) {
+        if (exportPath.trimmedNonEmpty() != null) {
           prefs.setString(
               dtkGitExportPathGlobalPrefsKey, absolute(normalize(exportPath)));
         }
