@@ -1,3 +1,7 @@
+import 'package:cv/cv.dart';
+import 'package:dev_build/build_support.dart';
+import 'package:process_run/shell.dart';
+import 'package:process_run/stdio.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart';
 import 'package:tekartik_prj_tktools/tkreg.dart';
@@ -20,4 +24,21 @@ Future<String> tkPubGetPackageLocalPath(
       githubTop: githubTop,
       gitUrl: dbPackage.gitUrl.v!,
       gitPath: dbPackage.gitPath.v);
+}
+
+/// Read in the package-config.yaml
+Future<Model> tkPubGetPackageConfigMap(String pkgPath) async {
+  Model? packageConfigMap;
+  try {
+    packageConfigMap = await pathGetPackageConfigMap(pkgPath);
+  } catch (_) {
+    try {
+      await Shell(workingDirectory: pkgPath).run('pub get');
+
+      packageConfigMap = await pathGetPubspecYamlMap(pkgPath);
+    } catch (e) {
+      stderr.writeln('Error: $e failed to get package-config.yaml');
+    }
+  }
+  return packageConfigMap!;
 }
