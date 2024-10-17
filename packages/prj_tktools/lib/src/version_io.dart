@@ -1,4 +1,5 @@
 import 'package:dev_build/build_support.dart';
+import 'package:fs_shim/utils/io/read_write.dart';
 import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/version_utils.dart';
@@ -24,5 +25,5 @@ Future<void> pathVersionBump(
   var yaml = await file.readAsString();
   var yamlEditor = YamlEditor(yaml);
   yamlEditor.update(['version'], version.toString());
-  await file.writeAsString(yamlEditor.toString());
+  await file.writeAsString(stringToIoString(yamlEditor.toString()));
 }
