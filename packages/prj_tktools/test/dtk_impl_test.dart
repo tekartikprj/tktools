@@ -6,9 +6,9 @@ import 'package:test/test.dart';
 Future<void> main() async {
   group('dtkgitconfig_db', () {
     test('simple', () async {
-      var db =
-          DtkGitConfigDb(await newDatabaseFactoryMemory().openDatabase('test'));
-
+      var db = DtkGitConfigDb(
+          database: await newDatabaseFactoryMemory().openDatabase('test'));
+      db.initBuilders();
       var package = dtkGitDbRepositoryStore.record('repo1').cv()
         ..gitUrl.v = 'gitUri1';
       await db.setRepository(package);

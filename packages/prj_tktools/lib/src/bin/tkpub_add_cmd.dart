@@ -1,5 +1,7 @@
 import 'package:args/args.dart';
 import 'package:cv/cv.dart';
+import 'package:fs_shim/utils/io/read_write.dart' show linesToIoString;
+import 'package:fs_shim/utils/path.dart' show toPosixPath;
 import 'package:path/path.dart';
 import 'package:process_run/shell.dart';
 import 'package:process_run/stdio.dart';
@@ -8,6 +10,7 @@ import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_package_info.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/tkpub.dart';
 import 'package:tekartik_sc/git.dart';
 import 'package:yaml/yaml.dart';
 
@@ -389,8 +392,9 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
                 var relativePath = relative(dependencyPath, from: path);
 
                 if (hasDependency) {
+                  var posixPath = toPosixPath(relativePath);
                   overrides[package.id] = {
-                    'path': relativePath,
+                    'path': posixPath,
                   };
                   stdout.writeln('Adding $packageName: path: $relativePath');
                 }
@@ -398,7 +402,7 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
 
               if (overrides.isNotEmpty) {
                 var lines = pubspecOverridesMap.toYamlStrings('');
-                var txt = '${lines.join('\n')}\n';
+                var txt = linesToIoString(lines);
                 await pubspecOverrideFile.writeAsString(txt);
               } else {
                 await pubspecOverrideFile.delete(recursive: true);

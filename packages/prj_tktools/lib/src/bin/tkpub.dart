@@ -59,7 +59,7 @@ abstract class TkPubSubCommand extends ShellBinCommand {
   }
 
   /// Run a db action
-  Future<T> dbAction<T>(Future<T> Function(ConfigDb db) action,
+  Future<T> dbAction<T>(Future<T> Function(TkPubConfigDb db) action,
       {bool? write}) async {
     return await tkPubDbAction(action,
         write: write, configExportPath: await getConfigExportPath());

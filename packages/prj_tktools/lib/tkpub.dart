@@ -7,6 +7,8 @@ export 'src/tkpub.dart'
 export 'src/tkpub_db.dart'
     show
         tkPubDbAction,
+        TkPubConfigDb,
+        TkPubConfigDbExt,
         //tkPubConfigRefRecord,
         //tkPubPackagesStore,
         TkPubDbPackage;

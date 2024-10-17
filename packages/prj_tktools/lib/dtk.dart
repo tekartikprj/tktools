@@ -6,11 +6,13 @@ export 'src/dtk/dtk.dart'
         dtkGitExportPathGlobalPrefsKey,
         dtkGetGitExportPath,
         dtkGitUniqueNameFromUrl;
+export 'src/dtk/dtk_config_db.dart' show DtkConfigDb, dtkConfigDbAction;
 export 'src/dtk/dtk_git_config_db.dart'
     show
         dtkGitGetAllRepositories,
         dtkGitConfigDbAction,
         DbDtkGitRepository,
         DbDtkGitRepositoryExt,
-        DtkGitConfigDb;
+        DtkGitConfigDb,
+        DtkGitConfigDbExt;
 export 'src/dtk/dtk_menu.dart' show dtkMenu;

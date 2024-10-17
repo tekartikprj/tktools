@@ -1,10 +1,6 @@
-import 'package:path/path.dart';
-import 'package:process_run/stdio.dart';
-import 'package:sembast/sembast_memory.dart';
-import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/tags.dart';
-import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
+import 'package:tekartik_prj_tktools/dtk.dart';
 
 /// Db config ref
 class DbDtkGitConfigRef extends DbStringRecordBase {
@@ -56,10 +52,18 @@ extension DbDtkGitRepositoryExt on DbDtkGitRepository {
   String get uniqueName => dtkGitUniqueNameFromUrl(gitUrl.v!);
 }
 
+/// DtkGitConfig db
+typedef DtkGitConfigDb = DtkConfigDb;
+
 /// Config database.
-class DtkGitConfigDb {
+extension DtkGitConfigDbExt on DtkConfigDb {
   /// the sembast db
-  final Database db;
+  Database get db => database;
+
+  /// Constructor
+  void initBuilders() {
+    _initBuilders();
+  }
 
   /// Get all repositories
   Future<List<DbDtkGitRepository>> getAllRepositories() async {
@@ -101,11 +105,6 @@ class DtkGitConfigDb {
     return repository;
   }
 
-  /// Constructor
-  DtkGitConfigDb(this.db) {
-    cvAddConstructors([DbDtkGitConfigRef.new, DbDtkGitRepository.new]);
-  }
-
   /// Close the db
   Future<void> close() async {
     await db.close();
@@ -126,56 +125,34 @@ var dtkGitDbConfigRefRecord =
 
 late String _configExportPath;
 var _initialized = false;
-Future<Database> _dtkGitConfigDbOpen({String? configExportPath}) async {
+
+void _initBuilders() {
+  cvAddConstructors([DbDtkGitConfigRef.new, DbDtkGitRepository.new]);
+}
+
+Future<String> _dtkGetGitConfigExportPath({String? configExportPath}) async {
   if (!_initialized) {
     configExportPath ??= await dtkGetGitExportPath();
 
     if (configExportPath == null) {
-      throw StateError('Not intialized');
+      throw StateError(
+          'Git config db not initialized, set global prefs $dtkGitExportPathGlobalPrefsKey');
     } else {
-      cvAddConstructor(DbDtkGitRepository.new);
-      cvAddConstructor(DbDtkGitConfigRef.new);
       _configExportPath = configExportPath;
       _initialized = true;
     }
+    _initBuilders();
   }
-
-  var factory = newDatabaseFactoryMemory();
-  Database? db;
-  var dbName = 'dtk_git_tmp.db';
-  var exportFile = File(_configExportPath);
-  if (exportFile.existsSync()) {
-    try {
-      db = await importDatabaseAny(
-          await exportFile.readAsLines(), factory, dbName);
-    } catch (e) {
-      stderr.writeln('error: $e');
-    }
-  }
-  db ??= await factory.openDatabase(dbName);
-  return db;
-}
-
-Future<void> _dtkGitConfigDbClose(Database db) async {
-  var exportFile = File(_configExportPath);
-  await Directory(dirname(exportFile.path)).create(recursive: true);
-  await exportFile
-      .writeAsString(exportLinesToJsonlString(await exportDatabaseLines(db)));
+  return _configExportPath;
 }
 
 /// tkpub action on db, import & export
 Future<T> dtkGitConfigDbAction<T>(Future<T> Function(DtkGitConfigDb db) action,
-    {bool? write, String? configExportPath}) async {
-  var db = await _dtkGitConfigDbOpen(configExportPath: configExportPath);
-  try {
-    return await action(DtkGitConfigDb(db));
-  } finally {
-    if (write ?? false) {
-      await _dtkGitConfigDbClose(db);
-    } else {
-      await db.close();
-    }
-  }
+    {bool? write, String? configExportPath, bool? verbose}) async {
+  var exportPath =
+      await _dtkGetGitConfigExportPath(configExportPath: configExportPath);
+  return await dtkConfigDbAction(action,
+      exportPath: exportPath, write: write, verbose: verbose);
 }
 
 /// Get all repositories

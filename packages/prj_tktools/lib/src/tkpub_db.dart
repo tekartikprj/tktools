@@ -1,9 +1,6 @@
-import 'package:path/path.dart';
-import 'package:process_run/stdio.dart';
-import 'package:sembast/sembast_memory.dart';
-import 'package:sembast/utils/sembast_import_export.dart';
 import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
+import 'package:tekartik_prj_tktools/dtk.dart';
 import 'package:tekartik_prj_tktools/src/tkpub.dart';
 
 /// path prefs key.
@@ -37,9 +34,12 @@ class TkPubDbPackage extends DbStringRecordBase {
 }
 
 /// Config database.
-class ConfigDb {
+typedef TkPubConfigDb = DtkConfigDb;
+
+/// Helpers
+extension TkPubConfigDbExt on TkPubConfigDb {
   /// the sembase db
-  final Database db;
+  Database get db => database;
 
   /// Delete a package
   Future<bool> deletePackage(String id) async {
@@ -81,9 +81,8 @@ class ConfigDb {
   }
 
   /// Constructor
-  ConfigDb(this.db) {
-    cvAddConstructor(TkPubDbPackage.new);
-    cvAddConstructor(DbConfigRef.new);
+  void initBuilders() {
+    _initBuilders();
   }
 
   /// Close the db
@@ -111,62 +110,40 @@ var tkPubConfigRefRecord =
 
 late String _configExportPath;
 var _initialized = false;
-Future<Database> _tkpubDbOpen({String? configExportPath}) async {
+
+void _initBuilders() {
+  cvAddConstructors([TkPubDbPackage.new, DbConfigRef.new]);
+}
+
+Future<String> _tkPubGetConfigExportPath({String? configExportPath}) async {
   if (!_initialized) {
-    configExportPath ??= await () async {
-      return await tkPubGetConfigExportPath();
-    }();
+    configExportPath ??= await tkPubGetConfigExportPath();
 
     if (configExportPath == null) {
       throw StateError('Not intialized, call tkpub_init first');
     } else {
+      // cvAddConstructors([DbDtkGitConfigRef.new, DbDtkGitRepository.new]);
       _configExportPath = configExportPath;
       _initialized = true;
     }
+    _initBuilders();
   }
-
-  var factory = newDatabaseFactoryMemory();
-  Database? db;
-  var dbName = 'tkpub_config.db';
-  var exportFile = File(_configExportPath);
-  if (exportFile.existsSync()) {
-    try {
-      db = await importDatabaseAny(
-          await exportFile.readAsLines(), factory, dbName);
-    } catch (e) {
-      stderr.writeln('error: $e');
-    }
-  }
-  db ??= await factory.openDatabase(dbName);
-  return db;
-}
-
-Future<void> _tkpubDbClose(Database db) async {
-  var exportFile = File(_configExportPath);
-  await Directory(dirname(exportFile.path)).create(recursive: true);
-  await exportFile
-      .writeAsString(exportLinesToJsonlString(await exportDatabaseLines(db)));
+  return _configExportPath;
 }
 
 /// tkpub action on db, import & export
-Future<T> tkPubDbAction<T>(Future<T> Function(ConfigDb db) action,
-    {bool? write, String? configExportPath}) async {
-  var db = await _tkpubDbOpen(configExportPath: configExportPath);
-  try {
-    return await action(ConfigDb(db));
-  } finally {
-    if (write ?? false) {
-      await _tkpubDbClose(db);
-    } else {
-      await db.close();
-    }
-  }
+Future<T> tkPubDbAction<T>(Future<T> Function(DtkGitConfigDb db) action,
+    {bool? write, String? configExportPath, bool? verbose}) async {
+  var exportPath =
+      await _tkPubGetConfigExportPath(configExportPath: configExportPath);
+  return dtkConfigDbAction(action,
+      exportPath: exportPath, write: write, verbose: verbose);
 }
 
 /// Get all packages
 Future<List<TkPubDbPackage>> tkPubGetAllPackages() async {
   return await tkPubDbAction((db) async {
-    var packages = await tkPubPackagesStore.query().getRecords(db.db);
+    var packages = await tkPubPackagesStore.query().getRecords(db.database);
     return packages;
   });
 }

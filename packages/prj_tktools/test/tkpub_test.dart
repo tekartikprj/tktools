@@ -17,8 +17,9 @@ void main() {
   });
   group('tkpub_db', () {
     test('simple', () async {
-      var db = ConfigDb(await newDatabaseFactoryMemory().openDatabase('test'));
-
+      var db = TkPubConfigDb(
+          database: await newDatabaseFactoryMemory().openDatabase('test'));
+      db.initBuilders();
       var package = tkPubPackagesStore.record('pkg1').cv()
         ..gitUrl.v = 'gitUri1';
       var config = tkPubConfigRefRecord.cv()..gitRef.v = 'gitRef1';

@@ -1,6 +1,6 @@
 name: tekartik_prj_tktools
 description: Base prj tktools
-version: 1.0.0
+version: 1.0.1
 publish_to: none
 
 environment:
@@ -8,6 +8,7 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
+  fs_shim: ">=2.3.2+3"
   args: '>=2.5.0'
   collection: '>=1.18.0' # not 1.19.0 as flutter 3.22 pins on 1.18
   cv: '>=1.0.0'
