@@ -51,6 +51,7 @@ dependencies:
       url: https://github.com/tekartik/prefs.dart
       ref: dart3a
       path: prefs
+  sqflite_common_ffi: '>=2.3.4-0'
 
 dev_dependencies:
   lints: '>=4.0.0'
