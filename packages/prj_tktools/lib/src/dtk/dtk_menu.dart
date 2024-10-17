@@ -354,7 +354,7 @@ void dtkMenu() {
             write('not found');
           } else {
             await db.setCurrentTimepoint(id);
-            write('deleted $timepoint');
+            write('current $timepoint');
           }
         }
       });
