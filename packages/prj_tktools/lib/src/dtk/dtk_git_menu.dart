@@ -459,7 +459,7 @@ void dtkGitMenu() {
         write(prefs.getString(dtkGitExportPathGlobalPrefsKey));
         var exportPath = await prompt('export path');
         if (exportPath.trimmedNonEmpty() != null) {
-          prefs.setString(
+          await prefs.setString(
               dtkGitExportPathGlobalPrefsKey, absolute(normalize(exportPath)));
         }
       });
