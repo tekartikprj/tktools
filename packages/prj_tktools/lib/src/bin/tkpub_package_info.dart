@@ -4,6 +4,9 @@ import 'package:cv/cv.dart';
 
 /// Pubspec target
 enum TkPubTarget {
+  /// direct: target
+  direct,
+
   /// dev: target
   dev,
 
@@ -23,11 +26,13 @@ String tkpubTargetToString(TkPubTarget target) {
       return 'override';
     case TkPubTarget.pubspecOverrides:
       return 'pubspec_overrides';
+    case TkPubTarget.direct:
+      return '';
   }
 }
 
 /// Package info for tkpub add
-class TkpubPackageInfo {
+class TkPubPackageInfo {
   /// def as a map.
   final Model? def;
 
@@ -38,13 +43,13 @@ class TkpubPackageInfo {
   final TkPubTarget? target;
 
   /// Package info
-  TkpubPackageInfo({this.def, required this.name, this.target});
+  TkPubPackageInfo({this.def, required this.name, this.target});
 
   /// Parse and argument like
   /// - test
   /// - dev:test
   /// - test:{"path":"../test"}
-  static TkpubPackageInfo parse(String arg) {
+  static TkPubPackageInfo parse(String arg) {
     arg = arg.trim();
     if (arg.startsWith("'") && arg.endsWith("'")) {
       arg = arg.substring(1, arg.length - 1);
@@ -107,12 +112,12 @@ class TkpubPackageInfo {
       }
     }
 
-    return TkpubPackageInfo(def: def, name: name, target: target);
+    return TkPubPackageInfo(def: def, name: name, target: target);
   }
 
   @override
   bool operator ==(Object other) {
-    if (other is TkpubPackageInfo) {
+    if (other is TkPubPackageInfo) {
       if (target == other.target &&
           name == other.name &&
           const DeepCollectionEquality().equals(def, other.def)) {

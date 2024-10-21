@@ -51,8 +51,8 @@ extension TkPubConfigDbExt on TkPubConfigDb {
   }
 
   /// set/update a package
-  Future<void> setPackage(TkPubDbPackage package) async {
-    await tkPubPackagesStore.record(package.id).put(db, package);
+  Future<TkPubDbPackage> setPackage(String id, TkPubDbPackage package) async {
+    return await tkPubPackagesStore.record(id).put(db, package);
   }
 
   /// Get a package

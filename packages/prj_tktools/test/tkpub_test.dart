@@ -7,13 +7,13 @@ import 'package:test/test.dart';
 void main() {
   test('TkpubPackageInfo', () {
     expect(
-        TkpubPackageInfo.parse('dev:test:{"dummy":"test"}'),
-        TkpubPackageInfo(
+        TkPubPackageInfo.parse('dev:test:{"dummy":"test"}'),
+        TkPubPackageInfo(
             target: TkPubTarget.dev, name: 'test', def: {'dummy': 'test'}));
-    expect(TkpubPackageInfo.parse('test'), TkpubPackageInfo(name: 'test'));
-    expect(TkpubPackageInfo.parse("'test'"), TkpubPackageInfo(name: 'test'));
-    expect(TkpubPackageInfo.parse('dev:test'),
-        TkpubPackageInfo(target: TkPubTarget.dev, name: 'test'));
+    expect(TkPubPackageInfo.parse('test'), TkPubPackageInfo(name: 'test'));
+    expect(TkPubPackageInfo.parse("'test'"), TkPubPackageInfo(name: 'test'));
+    expect(TkPubPackageInfo.parse('dev:test'),
+        TkPubPackageInfo(target: TkPubTarget.dev, name: 'test'));
   });
   group('tkpub_db', () {
     test('simple', () async {
@@ -25,7 +25,7 @@ void main() {
       var config = tkPubConfigRefRecord.cv()..gitRef.v = 'gitRef1';
 
       await config.put(db.db);
-      await db.setPackage(package);
+      await db.setPackage(package.id, package);
       package = await db.getPackage('pkg1');
       expect(package.gitRef.v, isNull);
       package = await db.getPackage('pkg1', addMissingRef: true);
