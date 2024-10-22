@@ -3,4 +3,7 @@ export 'src/dsenv.dart'
         dsUserEnvGetEncryptedVar,
         dsUserEnvGetVar,
         dsUserEnvSetEncryptedVar,
-        dsUserEnvSetVar;
+        dsUserEnvSetVar,
+        dsUserEnvGetEncryptedVarOrNull,
+        dsUserEnvGetVarOrNull,
+        dsUserClearVar;
