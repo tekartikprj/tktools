@@ -98,11 +98,10 @@ Future<Prefs> openPrefs() async {
 }
 
 /// Package store
-var tkPubPackagesStore =
-    cvStringRecordFactory.store<TkPubDbPackage>('packages');
+var tkPubPackagesStore = cvStringStoreFactory.store<TkPubDbPackage>('packages');
 
 /// Config store
-var configStore = cvStringRecordFactory.store<DbRecord<String>>('config');
+var configStore = cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
 var tkPubConfigRefRecord =

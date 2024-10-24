@@ -86,11 +86,11 @@ extension DtkDepConfigDbExt on DtkConfigDb {
 
 /// Dependency store
 var dtkDepDbDependencyStore =
-    cvStringRecordFactory.store<DbDtkDepDependency>('dependency');
+    cvStringStoreFactory.store<DbDtkDepDependency>('dependency');
 
 /// Config store
 var dtkDepDbConfigStore =
-    cvStringRecordFactory.store<DbRecord<String>>('config');
+    cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
 var dtkDepDbConfigRefRecord =

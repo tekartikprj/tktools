@@ -113,11 +113,11 @@ extension DtkGitConfigDbExt on DtkConfigDb {
 
 /// Repository store
 var dtkGitDbRepositoryStore =
-    cvStringRecordFactory.store<DbDtkGitRepository>('repository');
+    cvStringStoreFactory.store<DbDtkGitRepository>('repository');
 
 /// Config store
 var dtkGitDbConfigStore =
-    cvStringRecordFactory.store<DbRecord<String>>('config');
+    cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
 var dtkGitDbConfigRefRecord =

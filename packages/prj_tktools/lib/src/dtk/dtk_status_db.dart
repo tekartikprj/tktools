@@ -425,14 +425,14 @@ class DtkStatusDb {
 }
 
 /// Repository store
-var dbDtkTimepointStore = cvIntRecordFactory.store<DbDtkTimepoint>('timepoint');
+var dbDtkTimepointStore = cvIntStoreFactory.store<DbDtkTimepoint>('timepoint');
 
 /// action store
-var dbDtkActionStore = cvIntRecordFactory.store<DbDtkAction>('action');
+var dbDtkActionStore = cvIntStoreFactory.store<DbDtkAction>('action');
 
 /// Config store
 var dbDtkStatusConfigStore =
-    cvStringRecordFactory.store<DbDtkStatusConfig>('config');
+    cvStringStoreFactory.store<DbDtkStatusConfig>('config');
 
 /// Config record
 var dbDtkStatusConfigRecord = dbDtkStatusConfigStore.record('config');
