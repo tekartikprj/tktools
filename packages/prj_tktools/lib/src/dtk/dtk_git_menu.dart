@@ -355,7 +355,7 @@ void dtkGitMenu() {
                   ..tagFilter.v = tagFilterOrNull
                   ..dependencies.v = dependencies);
 
-            write('deleted $timepoint');
+            write('updated $timepoint');
           }
         }
       });
@@ -409,6 +409,20 @@ void dtkGitMenu() {
         var list = await dtkGitGetAllRepositories();
         for (var item in list) {
           write('${item.id} ${item.toMap()}');
+        }
+      });
+      item('list tags', () async {
+        var list = await dtkGitGetAllRepositories();
+        var tags = <String>{};
+        for (var item in list) {
+          if (item.tags.v?.isNotEmpty ?? false) {
+            tags.addAll(item.tags.v!);
+          }
+        }
+        var tagList = tags.toList()..sort();
+        write('tags: ${tagList.length}');
+        for (var tag in tagList) {
+          write(tag);
         }
       });
       item('add by unique name (prompt)', () async {
