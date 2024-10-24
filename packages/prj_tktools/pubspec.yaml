@@ -8,11 +8,11 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  fs_shim: ">=2.3.2+3"
+  fs_shim: ">=2.3.3+1"
   args: ">=2.6.0"
   collection: '>=1.18.0' # not 1.19.0 as flutter 3.22 pins on 1.18
   cv: ">=1.1.0+4"
-  dev_build: ">=1.1.0+1"
+  dev_build: ">=1.1.0+2"
   path: '>=1.9.0'
   process_run: ">=1.2.1+1"
   source_span: ">=1.10.0"

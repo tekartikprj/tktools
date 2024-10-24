@@ -210,64 +210,9 @@ class TkPubDepsManager {
               var pathsHandled = <String>{};
               while (true) {
                 List<String> allPaths;
-                if (options.readConfig) {
-                  allPaths = <String>[];
-                  var allPksPaths = await recursivePubPath(
-                    [gitTopLevelPath],
-                  );
-                  for (var pkgPath in allPksPaths.toList()) {
-                    var pubspecYaml = await pathGetPubspecYamlMap(pkgPath);
-                    if (pubspecYamlHasAnyDependencies(
-                        pubspecYaml, dependencies)) {
-                      if (options.verbose) {
-                        stdout.writeln(
-                            '$pkgPath has any dependencies in $dependencies');
-                      }
-                      allPaths.add(pkgPath);
-                    } else {
-                      if (options.verbose) {
-                        stdout.writeln(
-                            '$pkgPath does not have any dependencies in $dependencies, checking package-config.yaml');
-                      }
 
-                      Model? packageConfigMap;
-                      try {
-                        packageConfigMap =
-                            await pathGetPackageConfigMap(pkgPath);
-                      } catch (_) {
-                        try {
-                          await Shell(workingDirectory: pkgPath).run('pub get');
-
-                          packageConfigMap =
-                              await pathGetPubspecYamlMap(pkgPath);
-                        } catch (e) {
-                          stderr.writeln(
-                              'Error: $e failed to get package-config.yaml');
-                        }
-                      }
-                      if (packageConfigMap != null) {
-                        if (packageConfigGetPackages(packageConfigMap)
-                            .toSet()
-                            .intersection(dependencies.toSet())
-                            .isNotEmpty) {
-                          if (options.verbose) {
-                            stdout.writeln(
-                                '$pkgPath has any dependencies in $dependencies');
-                          }
-                          allPaths.add(pkgPath);
-                        } else {
-                          if (options.verbose) {
-                            stdout.writeln(
-                                '$pkgPath does not have any dependencies in $dependencies');
-                          }
-                        }
-                      }
-                    }
-                  }
-                } else {
-                  allPaths = await recursivePubPath([gitTopLevelPath],
-                      dependencies: dependencies);
-                }
+                allPaths = await recursivePubPath([gitTopLevelPath],
+                    dependencies: dependencies, readConfig: options.readConfig);
 
                 var newAll = allPackageWithDependency.toSet();
                 for (var path in allPaths) {

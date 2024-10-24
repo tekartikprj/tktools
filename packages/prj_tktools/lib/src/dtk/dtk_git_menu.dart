@@ -138,7 +138,8 @@ class DtkFindDartProjectActionRunner
     var reposAction = await db.getFindReposAction();
     var gitTop = reposAction.gitTop.v!;
     var repos = reposAction.repos.v!;
-
+    var timepoint = await db.getCurrentTimepoint();
+    stdout.writeln('timepoint: $timepoint');
     for (var repo in repos) {
       var findDartProjectAction =
           await db.findOrCreateAction<DbDtkActionFindDartProject>(action,
@@ -149,7 +150,8 @@ class DtkFindDartProjectActionRunner
         continue;
       }
       var gitProjectTop = join(gitTop, repo);
-      var paths = (await recursivePubPath([gitProjectTop]))
+      var paths = (await recursivePubPath([gitProjectTop],
+              dependencies: timepoint?.dependencies.v, readConfig: true))
           .map((path) => relative(path, from: gitProjectTop))
           .toList();
       stdout.writeln('repo $repo: $paths');
@@ -292,19 +294,35 @@ void dtkGitMenu() {
       });
     });
     menu('timepoint', () {
+      List<String>? dependenciesFromString(String deps, {String? defaultDeps}) {
+        var depsOrNull = deps.trimmedNonEmpty() ?? defaultDeps;
+        var dependencies = depsOrNull?.split(',').map((e) => e.trim()).toList();
+        return dependencies;
+      }
+
+      String? tagFilterFromString(String tagFilter,
+          {String? defaultTagFilter}) {
+        var tagFilterOrNull = tagFilter.trimmedNonEmpty() ?? defaultTagFilter;
+        if (tagFilterOrNull == '*') {
+          tagFilterOrNull = null;
+        }
+        return tagFilterOrNull;
+      }
+
       item('add timepoint', () async {
-        var defaultTagFilter =
-            (await db.getConfig())?.defaultTagFilter.v?.nonEmpty() ?? '*';
+        var config = await db.getConfig();
+        var defaultTagFilter = config?.defaultTagFilter.v?.nonEmpty() ?? '*';
+
         var tagFilter =
             await prompt('tag filter (default: $defaultTagFilter, * for all)');
-        if (tagFilter.nonEmpty() == null) {
-          tagFilter = defaultTagFilter;
-        }
-        if (tagFilter == '*') {
-          tagFilter = '';
-        }
-        var timepoint =
-            await db.createTimepoint(tagFilter: tagFilter.nonEmpty());
+        var tagFilterOrNull =
+            tagFilterFromString(tagFilter, defaultTagFilter: defaultTagFilter);
+
+        var deps = await prompt('deps (comma separated)');
+        var dependencies = dependenciesFromString(deps);
+
+        var timepoint = await db.createTimepoint(
+            tagFilter: tagFilterOrNull, dependencies: dependencies);
         write(timepoint);
       });
       Future<void> listTimepoints() async {
@@ -314,6 +332,33 @@ void dtkGitMenu() {
           write('${id == item.id ? '* ' : '  '}${item.id} ${item.toMap()}');
         }
       }
+
+      item('edit timepoint', () async {
+        await listTimepoints();
+        var id = parseInt(await prompt('edit id'));
+        if (id != null) {
+          var timepoint = await db.getTimepoint(id);
+          if (timepoint == null) {
+            write('not found');
+          } else {
+            var defaultTagFilter = timepoint.tagFilter.v?.nonEmpty() ?? '*';
+            var tagFilter = await prompt(
+                'tag filter (default: $defaultTagFilter, * for all)');
+            var tagFilterOrNull = tagFilterFromString(tagFilter,
+                defaultTagFilter: defaultTagFilter);
+            var deps = await prompt('deps (comma separated)');
+            var dependencies = dependenciesFromString(deps,
+                defaultDeps: timepoint.dependencies.v?.join(','));
+            timepoint = await dbDtkTimepointStore.record(id).put(
+                db.db,
+                timepoint
+                  ..tagFilter.v = tagFilterOrNull
+                  ..dependencies.v = dependencies);
+
+            write('deleted $timepoint');
+          }
+        }
+      });
 
       item('list timepoints', () async {
         await listTimepoints();
