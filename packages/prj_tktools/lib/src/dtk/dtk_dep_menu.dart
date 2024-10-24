@@ -42,7 +42,7 @@ void dtkDepMenu() {
         });
       });
       item('delete', () async {
-        var id = await prompt('id');
+        var id = await prompt('dependency to delete');
         if (id.isNotEmpty) {
           await dtkDepConfigDbAction((db) async {
             var deleted = await db.deleteDependency(id);
@@ -56,7 +56,7 @@ void dtkDepMenu() {
       });
 
       item('add', () async {
-        var id = await prompt('dependency');
+        var id = await prompt('dependency to add/modify');
         if (id.isNotEmpty) {
           var dependency = await dtkDepConfigDbAction((db) async {
             return await db.getDependencyOrNull(id);

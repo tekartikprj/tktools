@@ -139,8 +139,9 @@ class TkPubDepsManager {
         if (!pubspecOverrides || bothDepsAndPubspecOverrides) {
           // Not pubspec overrides
           Future<void> handlePath(String path) async {
-            stdout.writeln('# ${relative(path, from: topPath)}');
-            var pubspecMap = await pathGetPubspecYamlMap('.');
+            var subPath = relative(path, from: topPath);
+            stdout.writeln('# $subPath');
+            var pubspecMap = await pathGetPubspecYamlMap(subPath);
             var localPackageName = pubspecYamlGetPackageName(pubspecMap)!;
             if (packageName == localPackageName) {
               if (options.verbose) {
@@ -151,7 +152,7 @@ class TkPubDepsManager {
             var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
             var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
 
-            var shell = Shell(workingDirectory: topPath);
+            var shell = Shell(workingDirectory: subPath);
             var dev = info.target == TkPubTarget.dev ||
                 (info.target == null && options.devDependencies);
             var overrides = info.target == TkPubTarget.override ||
@@ -167,12 +168,12 @@ class TkPubDepsManager {
                   throw StateError('Package not found $packageName');
                 }
                 toAdd.add(
-                    topPath,
+                    subPath,
                     shellArgument('$prefix'
                         '$packageName'));
               } else {
                 toAdd.add(
-                    topPath,
+                    subPath,
                     shellArgument('$prefix'
                         '$packageName:'
                         '${jsonEncode({
