@@ -81,7 +81,7 @@ class _SetCommand extends _TkPubConfigSubCommand {
         ..gitUrl.v = gitUrl
         ..gitPath.setValue(gitPath)
         ..gitRef.setValue(gitRef);
-      await db.setPackage(package);
+      await db.setPackage(package.id, package);
       writePackageConfig(package);
     }, write: true);
     return true;

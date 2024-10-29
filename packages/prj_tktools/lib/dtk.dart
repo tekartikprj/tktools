@@ -4,6 +4,7 @@ library;
 export 'src/dtk/dtk.dart'
     show
         dtkGitExportPathGlobalPrefsKey,
+        dtkDepExportPathGlobalPrefsKey,
         dtkGetGitExportPath,
         dtkGitUniqueNameFromUrl;
 export 'src/dtk/dtk_config_db.dart' show DtkConfigDb, dtkConfigDbAction;

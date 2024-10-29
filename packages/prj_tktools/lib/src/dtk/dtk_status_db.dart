@@ -11,8 +11,11 @@ class DbDtkTimepoint extends DbIntRecordBase {
   /// tag filter
   final tagFilter = CvField<String>('tagFilter');
 
+  /// Dependencies, only for project depending on this dependency
+  final dependencies = CvListField<String>('dependencies');
+
   @override
-  CvFields get fields => [timestamp, tagFilter];
+  CvFields get fields => [timestamp, tagFilter, dependencies];
 }
 
 /// Db status config
@@ -350,19 +353,21 @@ class DtkStatusDb {
 
   /// Delete a Repository
   Future<DbDtkTimepoint> createTimepoint(
-      {Timestamp? now, String? tagFilter}) async {
+      {Timestamp? now, String? tagFilter, List<String>? dependencies}) async {
     return await db.transaction((txn) async {
-      return await _createTimepoint(txn, now: now, tagFilter: tagFilter);
+      return await _createTimepoint(txn,
+          now: now, tagFilter: tagFilter, dependencies: dependencies);
     });
   }
 
   /// Delete a Repository
   Future<DbDtkTimepoint> _createTimepoint(Transaction txn,
-      {Timestamp? now, String? tagFilter}) async {
+      {Timestamp? now, String? tagFilter, List<String>? dependencies}) async {
     now ??= Timestamp.now();
     var record = DbDtkTimepoint()
       ..timestamp.v = now
-      ..tagFilter.v = tagFilter;
+      ..tagFilter.setValue(tagFilter)
+      ..dependencies.setValue(dependencies);
     var timepoint = await dbDtkTimepointStore.add(txn, record);
     await _setCurrentTimepointId(txn, timepoint.id);
     return timepoint;
@@ -425,14 +430,14 @@ class DtkStatusDb {
 }
 
 /// Repository store
-var dbDtkTimepointStore = cvIntRecordFactory.store<DbDtkTimepoint>('timepoint');
+var dbDtkTimepointStore = cvIntStoreFactory.store<DbDtkTimepoint>('timepoint');
 
 /// action store
-var dbDtkActionStore = cvIntRecordFactory.store<DbDtkAction>('action');
+var dbDtkActionStore = cvIntStoreFactory.store<DbDtkAction>('action');
 
 /// Config store
 var dbDtkStatusConfigStore =
-    cvStringRecordFactory.store<DbDtkStatusConfig>('config');
+    cvStringStoreFactory.store<DbDtkStatusConfig>('config');
 
 /// Config record
 var dbDtkStatusConfigRecord = dbDtkStatusConfigStore.record('config');

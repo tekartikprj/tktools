@@ -34,11 +34,11 @@ Future<DtkConfigDb> _dtkConfigDbOpen(
   Database? db;
   var dbName = 'tmp.db';
   var exportFile = File(exportPath);
+  if (verbose) {
+    stderr.writeln('importing $exportPath');
+  }
   if (exportFile.existsSync()) {
     try {
-      if (verbose) {
-        stderr.writeln('importing $exportPath');
-      }
       db = await importDatabaseAny(
           await exportFile.readLines(), factory, dbName);
     } catch (e) {

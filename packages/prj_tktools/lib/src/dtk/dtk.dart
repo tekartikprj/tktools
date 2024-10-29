@@ -3,10 +3,20 @@ import 'package:tekartik_prj_tktools/tkreg.dart';
 /// Prefs key for the git export path
 const dtkGitExportPathGlobalPrefsKey = 'com.tekartik.dtk.gitExportPath';
 
+/// Prefs key for the dep export path
+const dtkDepExportPathGlobalPrefsKey = 'com.tekartik.dtk.depExportPath';
+
 /// Get git export path
 Future<String?> dtkGetGitExportPath() async {
   var prefs = await openGlobalPrefsPrefs();
   var path = prefs.getString(dtkGitExportPathGlobalPrefsKey);
+  return path;
+}
+
+/// Get dep export path
+Future<String?> dtkGetDepExportPath() async {
+  var prefs = await openGlobalPrefsPrefs();
+  var path = prefs.getString(dtkDepExportPathGlobalPrefsKey);
   return path;
 }
 

@@ -51,8 +51,8 @@ extension TkPubConfigDbExt on TkPubConfigDb {
   }
 
   /// set/update a package
-  Future<void> setPackage(TkPubDbPackage package) async {
-    await tkPubPackagesStore.record(package.id).put(db, package);
+  Future<TkPubDbPackage> setPackage(String id, TkPubDbPackage package) async {
+    return await tkPubPackagesStore.record(id).put(db, package);
   }
 
   /// Get a package
@@ -98,11 +98,10 @@ Future<Prefs> openPrefs() async {
 }
 
 /// Package store
-var tkPubPackagesStore =
-    cvStringRecordFactory.store<TkPubDbPackage>('packages');
+var tkPubPackagesStore = cvStringStoreFactory.store<TkPubDbPackage>('packages');
 
 /// Config store
-var configStore = cvStringRecordFactory.store<DbRecord<String>>('config');
+var configStore = cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
 var tkPubConfigRefRecord =

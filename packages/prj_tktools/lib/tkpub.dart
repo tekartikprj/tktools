@@ -3,6 +3,7 @@ export 'src/tkpub.dart'
     show
         tkPubGetPackageLocalPath,
         tkPubGetConfigExportPath,
+        tkPubGetPackageConfigMap,
         tkPubExportPathGlobalPrefsKey;
 export 'src/tkpub_db.dart'
     show
