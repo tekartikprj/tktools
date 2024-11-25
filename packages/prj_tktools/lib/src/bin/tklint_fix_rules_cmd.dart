@@ -47,6 +47,7 @@ Future<void> tklintFixRules(String path,
     rules = await package.getRules(analysisOptionsPath,
         handleInclude: true, fromInclude: true);
   }
+  rules.removeObsoleteRules();
 
   if (verbose) {
     stdout.writeln('Resulting rules:');
@@ -56,7 +57,7 @@ Future<void> tklintFixRules(String path,
   }
 
   rules.sort();
-  var file = File(analysisOptionsPath);
+  var file = File(package.getAbsolutePath(analysisOptionsPath));
   final yamlEditor = YamlEditor(await file.readAsString());
   var yamlObject = rules.toYamlObject();
   // print(yamlObject);
@@ -76,6 +77,7 @@ Fix rules overrides over another file
       ''') {
     parser.addOption('include',
         help: 'Include first the rules from another project file');
+    parser.addFlag('recursive', help: 'Go recursive in dart projects');
   }
 
   @override
@@ -83,13 +85,20 @@ Fix rules overrides over another file
     var verbose = this.verbose;
     var rest = results.rest;
     var include = results.option('include');
+    var recursive = results.flag('recursive');
     String? analysisOptionsPath;
     if (rest.isNotEmpty) {
       analysisOptionsPath = rest.first;
     }
-    await tklintFixRules('.',
-        analysisOptionsPath: analysisOptionsPath,
-        options: TklintFixRulesOptions(include: include, verbose: verbose));
+    var dirs = ['.'];
+    if (recursive) {
+      dirs = await recursivePubPath(dirs);
+    }
+    for (var dir in dirs) {
+      await tklintFixRules(dir,
+          analysisOptionsPath: analysisOptionsPath,
+          options: TklintFixRulesOptions(include: include, verbose: verbose));
+    }
     return true;
   }
 }

@@ -124,6 +124,19 @@ class Rules {
   void removeDifferentRules(Rules fromRules) {
     rules.removeWhere((element) => fromRules.rules.contains(element));
   }
+
+  static const _obsoleteRules = [
+    /// Added  2024-11-25
+    'unsafe_html',
+
+    /// Added  2024-11-25
+    'package_api_docs',
+  ];
+
+  /// Remove obsolete rules
+  void removeObsoleteRules() {
+    rules.removeWhere((element) => _obsoleteRules.contains(element.name));
+  }
 }
 
 /// Clear
@@ -210,7 +223,8 @@ class Package {
   /// Get rules
   Future<Rules> getIncludeRules(String path) async {
     await _initialized;
-    var yaml = loadYaml(await File(path).readAsString()) as Map;
+    var filePath = _fixPath(path);
+    var yaml = loadYaml(await File(filePath).readAsString()) as Map;
     var include = yaml.getKeyPathValue(['include'])?.toString();
     if (include != null) {
       var resolvedInclude = await resolvePath(include);
@@ -220,6 +234,11 @@ class Package {
       return await getRules(resolvedInclude, handleInclude: true);
     }
     return Rules();
+  }
+
+  /// Get absolute path relative to top package
+  String getAbsolutePath(String path) {
+    return _fixPath(path);
   }
 
   String _fixPath(String path) {
@@ -235,7 +254,8 @@ class Package {
     await _initialized;
     handleInclude ??= false;
     fromInclude ??= false;
-    var yaml = loadYaml(await File(_fixPath(path)).readAsString()) as Map;
+    var analysisOptionsPath = _fixPath(path);
+    var yaml = loadYaml(await File(analysisOptionsPath).readAsString()) as Map;
 
     Rules? includeRules;
     var rules = Rules();
