@@ -3,8 +3,8 @@ import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 
 import 'package:tekartik_common_utils/common_utils_import.dart';
-import 'package:tekartik_prj_tktools/src/bin/tklint_list_rules_cmd.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
+import 'package:tekartik_prj_tktools/src/tklint/tklint_package.dart';
 import 'package:tekartik_prj_tktools/src/yaml_edit.dart';
 import 'package:tekartik_pub/io.dart';
 import 'package:yaml_edit/yaml_edit.dart';
@@ -26,14 +26,14 @@ Future<void> tklintFixRules(String path,
     {String? analysisOptionsPath, TklintFixRulesOptions? options}) async {
   var include = options?.include;
   var verbose = options?.verbose ?? false;
-  var package = Package(path, verbose: verbose);
+  var package = TkLintPackage(path, verbose: verbose);
   analysisOptionsPath ??= 'analysis_options.yaml';
 
-  Rules rules;
+  TkLintRules rules;
 
   if (include != null) {
     var includePackagePath = await getPubPackageRoot(include);
-    var includePackage = Package(includePackagePath, verbose: verbose);
+    var includePackage = TkLintPackage(includePackagePath, verbose: verbose);
     var includeRules = await includePackage.getRules(
         relative(include, from: includePackagePath),
         handleInclude: true);
