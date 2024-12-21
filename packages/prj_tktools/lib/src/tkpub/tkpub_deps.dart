@@ -1,4 +1,5 @@
 import 'package:cv/cv.dart';
+import 'package:dev_build/menu/menu_run_ci.dart';
 import 'package:dev_build/shell.dart';
 import 'package:fs_shim/utils/io/read_write.dart' show linesToIoString;
 import 'package:fs_shim/utils/path.dart' show toPosixPath;
@@ -97,8 +98,11 @@ class TkPubDepsManager {
       stderr.writeln('Must specify --pubspec-overrides');
     }
     Future<void> handlePath(String path) async {
-      stdout.writeln('# ${relative(path, from: this.path)}');
-      var pubspecOverrideFile = File(join(path, 'pubspec_overrides.yaml'));
+      var workPath = await pathGetResolvedWorkPath(path);
+      var pubspecOverrideFile =
+          File(await pathGetPubspecOverridesYamlPath(path));
+      stdout.writeln('# ${relative(path, from: workPath)}');
+
       if (pubspecOverrideFile.existsSync()) {
         await pubspecOverrideFile.delete();
         stdout.writeln('Removed pubspec_overrides.yaml');
@@ -199,7 +203,7 @@ class TkPubDepsManager {
 
           var allPackageWithDependency = <String>{};
 
-          if (bothDepsAndPubspecOverrides) {
+          if (bothDepsAndPubspecOverrides || options.force) {
             /// Also specified as a dependency
             /// So don't check other projects
           } else {
@@ -241,7 +245,9 @@ class TkPubDepsManager {
 
           Future<void> handlePath(String path) async {
             stdout.writeln('# ${relative(path, from: topPath)}');
-            var localPubspecMap = await pathGetPubspecYamlMap(path);
+            var prj = PubIoPackage(path);
+            await prj.ready;
+            var localPubspecMap = prj.pubspecYaml;
             var localPackageName = pubspecYamlGetPackageName(localPubspecMap)!;
 
             if (packageName == localPackageName) {
@@ -250,13 +256,13 @@ class TkPubDepsManager {
               }
               return;
             }
-            var isFlutterPackage = pubspecYamlSupportsFlutter(localPubspecMap);
+            var isFlutterPackage = prj.isFlutter;
             var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
 
             var hasDependency =
                 allPackageWithDependency.contains(localPackageName) ||
                     bothDepsAndPubspecOverrides;
-            if (!hasDependency) {
+            if (!hasDependency && !options.force) {
               if (options.verbose) {
                 stdout.writeln('$packageName not a dependency');
               }
@@ -266,8 +272,10 @@ class TkPubDepsManager {
                 ?.anyAs<Map?>()
                 ?.deepClone();
             // devPrint('inlineOverrides: $inlineOverrides');
+            var workPath = await pathGetResolvedWorkPath(path);
             var pubspecOverrideFile =
-                File(join(path, 'pubspec_overrides.yaml'));
+                File(await pathGetPubspecOverridesYamlPath(path));
+
             var pubspecOverridesMap = Model();
             try {
               var existingText = await pubspecOverrideFile.readAsString();
@@ -322,9 +330,9 @@ class TkPubDepsManager {
                   githubTop: githubTop,
                   gitUrl: package.gitUrl.v!,
                   gitPath: package.gitPath.v);
-              var relativePath = relative(dependencyPath, from: path);
+              var relativePath = relative(dependencyPath, from: workPath);
 
-              if (hasDependency) {
+              if (hasDependency || options.force) {
                 var posixPath = toPosixPath(relativePath);
                 overrides[package.id] = {
                   'path': posixPath,
@@ -339,7 +347,9 @@ class TkPubDepsManager {
               var txt = linesToIoString(lines);
               await pubspecOverrideFile.writeAsString(txt);
             } else {
-              await pubspecOverrideFile.delete(recursive: true);
+              if (pubspecOverrideFile.existsSync()) {
+                await pubspecOverrideFile.delete();
+              }
             }
             // Only perform a get if non is planned yet
             var shouldPubGet = true;

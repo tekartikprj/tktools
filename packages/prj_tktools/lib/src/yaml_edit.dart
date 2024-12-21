@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:source_span/source_span.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
@@ -41,8 +43,11 @@ extension on Object? {
 
 /// Yaml editor extension
 extension TekartikYamlEditorExt on YamlEditor {
+  /// Export current result as lines
+  List<String> toLines() => LineSplitter.split(toString()).toList();
+
   /// Update or add a value at a given path
-  void updateOrAdd(List<Object> path, Object? value) {
+  void updateOrAdd(List<Object> path, Object? value, {int? index}) {
     var existing = parseAt(path, orElse: () => _noYamlNode);
     if (!identical(existing, _noYamlNode)) {
       if (value.isEmpty && existing.isEmpty) {

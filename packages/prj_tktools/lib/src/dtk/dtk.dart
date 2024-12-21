@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:fs_shim/utils/io/read_write.dart';
+import 'package:tekartik_common_utils/string_utils.dart';
 import 'package:tekartik_prj_tktools/tkreg.dart';
 
 /// Prefs key for the git export path
@@ -5,6 +9,36 @@ const dtkGitExportPathGlobalPrefsKey = 'com.tekartik.dtk.gitExportPath';
 
 /// Prefs key for the dep export path
 const dtkDepExportPathGlobalPrefsKey = 'com.tekartik.dtk.depExportPath';
+
+/// common extension
+extension DtkFileExt on File {
+  /// Write file at path if needed
+  Future<void> writeLinesIfNeeded(List<String> newLines,
+      {bool? verbose, bool? verboseIfNeeded}) async {
+    verbose ??= false;
+    verboseIfNeeded ??= false;
+    var file = this;
+    if (file.existsSync()) {
+      var existing = await file.readAsLines();
+      if (existing.matchesStringList(newLines)) {
+        if (verbose) {
+          stdout.writeln(('up to date: $path'));
+        }
+      } else {
+        await file.writeLines(newLines);
+        if (verbose || verboseIfNeeded) {
+          stdout.writeln(('writing...: $path'));
+        }
+      }
+    } else {
+      await writeLines(file, newLines);
+      if (verbose || verboseIfNeeded) {
+        stdout.writeln(('creating..: $path'));
+      }
+    }
+    return;
+  }
+}
 
 /// Get git export path
 Future<String?> dtkGetGitExportPath() async {
