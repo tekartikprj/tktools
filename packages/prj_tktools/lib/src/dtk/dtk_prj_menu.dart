@@ -22,14 +22,18 @@ void _dtkPrjMenu({required String path}) {
   menu('project at $path (${normalize(absolute(path))}', () {
     enter(() async {
       var dtkProject = PubIoPackage(path);
-      await dtkProject.ready;
-      write('path: $path');
-      write('isWorkspace: ${dtkProject.isWorkspace}');
-      write('isFlutter: ${dtkProject.isFlutter}');
       try {
-        write('workPath: ${await pathGetResolvedWorkPath(path)}');
+        await dtkProject.ready;
+        write('path: $path');
+        write('isWorkspace: ${dtkProject.isWorkspace}');
+        write('isFlutter: ${dtkProject.isFlutter}');
+        try {
+          write('workPath: ${await pathGetResolvedWorkPath(path)}');
+        } catch (e) {
+          write('workPath error: $e');
+        }
       } catch (e) {
-        write('workPath error: $e');
+        write('not a dart project, error: $e');
       }
     });
     item('menu run_ci', () async {
@@ -51,6 +55,11 @@ void _dtkPrjMenu({required String path}) {
       });
       item('create workspace root project', () async {
         await prj.createWorkspaceRootProject();
+      });
+      item('create workspace root project and add sub project to root',
+          () async {
+        await prj.createWorkspaceRootProject();
+        await prj.addAllProjectsToWorkspace();
       });
       item('add to workspace', () async {
         await prj.addToWorkspace();

@@ -95,7 +95,8 @@ class DtkProject {
     });
   }
 
-  final _lock = Lock(reentrant: true);
+  /// Make static for cross project lock
+  static final _lock = Lock();
 
   /// Add current project to workspace
   Future<void> _addToWorkspace() async {
@@ -138,6 +139,7 @@ class DtkProject {
     }
     var file = File(join(parent, 'pubspec.yaml'));
     var yamlEditor = YamlEditor(await file.readAsString());
+    stdout.writeln('Setting $newList to workspace');
     yamlEditor.updateOrAdd(['workspace'], newList);
     await file.writeLinesIfNeeded(yamlEditor.toLines(), verbose: true);
   }
