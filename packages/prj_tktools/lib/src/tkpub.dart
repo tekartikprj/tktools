@@ -18,12 +18,15 @@ Future<String?> tkPubGetConfigExportPath() async {
 
 /// Get local path
 Future<String> tkPubGetPackageLocalPath(
-    String githubTop, String package) async {
+  String githubTop,
+  String package,
+) async {
   var dbPackage = await tkPubDbAction((db) => db.getPackage(package));
   return getDependencyLocalPath(
-      githubTop: githubTop,
-      gitUrl: dbPackage.gitUrl.v!,
-      gitPath: dbPackage.gitPath.v);
+    githubTop: githubTop,
+    gitUrl: dbPackage.gitUrl.v!,
+    gitPath: dbPackage.gitPath.v,
+  );
 }
 
 /// Read in the package-config.yaml
@@ -33,7 +36,7 @@ Future<Model> tkPubGetPackageConfigMap(String pkgPath) async {
     packageConfigMap = await pathGetPackageConfigMap(pkgPath);
   } catch (_) {
     try {
-      await Shell(workingDirectory: pkgPath).run('pub get');
+      await Shell(workingDirectory: pkgPath).run('dart pub get');
 
       packageConfigMap = await pathGetPubspecYamlMap(pkgPath);
     } catch (e) {

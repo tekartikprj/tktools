@@ -1,13 +1,13 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:cv/cv.dart';
-import 'package:dev_build/build_support.dart';
 import 'package:fs_shim/utils/path.dart' show toPosixPath;
 import 'package:path/path.dart';
+import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_mustache/mustache.dart';
 import 'package:tekartik_prj_tktools/file_lines_io.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
+import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/yaml_edit.dart';
 
 extension on String {
@@ -50,8 +50,9 @@ resolution: workspace
     .lines;
 
 /// Get the pubspec.yaml lines for an empty project
-Future<List<String>> getEmptyProjectPubspecLines(
-    {required String projectName}) async {
+Future<List<String>> getEmptyProjectPubspecLines({
+  required String projectName,
+}) async {
   return _renderLines(_projectPubspec, {'projectName': projectName});
 }
 
@@ -68,7 +69,8 @@ class DtkProject {
     var file = File(join(path, 'pubspec.yaml'));
     if (!file.existsSync()) {
       await file.writeLines(
-          await getEmptyProjectPubspecLines(projectName: projectName));
+        await getEmptyProjectPubspecLines(projectName: projectName),
+      );
       stdout.writeln('wrote $file');
     } else {
       stderr.writeln('$file already exists');
@@ -88,6 +90,15 @@ class DtkProject {
 
   /// Add current project to workspace
   Future<void> addToWorkspace() async {
+    await _lock.synchronized(() async {
+      await _addToWorkspace();
+    });
+  }
+
+  final _lock = Lock(reentrant: true);
+
+  /// Add current project to workspace
+  Future<void> _addToWorkspace() async {
     await _setWorkspaceResolution();
     await _addToRootWorkspace();
   }
@@ -131,7 +142,7 @@ class DtkProject {
     await file.writeLinesIfNeeded(yamlEditor.toLines(), verbose: true);
   }
 
-  /// Add current project to workspace
+  /// Set "resolution: workspace" in pubspec.yaml
   Future<void> _setWorkspaceResolution() async {
     var file = File(join(path, 'pubspec.yaml'));
     if (!file.existsSync()) {
@@ -150,5 +161,21 @@ class DtkProject {
       yamlEditor.updateOrAdd(['resolution'], 'workspace');
       await file.writeLinesIfNeeded(yamlEditor.toLines(), verbose: true);
     }
+  }
+
+  /// Add all projects (inner directories) to workspace
+  Future<void> addAllProjectsToWorkspace() async {
+    /// Safe compare
+    var normalizedPath = normalize(absolute(path));
+    await recursiveActions(
+      [path],
+      action: (path) async {
+        if (normalize(absolute(path)) == normalizedPath) {
+          return;
+        }
+        var dtkProject = DtkProject(path);
+        await dtkProject.addToWorkspace();
+      },
+    );
   }
 }

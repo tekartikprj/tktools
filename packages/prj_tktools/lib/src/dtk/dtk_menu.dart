@@ -10,7 +10,12 @@ Future<void> main(List<String> args) async {
 }
 
 /// dtk menu
-void dtkMenu() {
+void dtkMenu({String? path}) {
+  _dtkMenu(path: path ?? '.');
+}
+
+/// dtk menu
+void _dtkMenu({required String path}) {
   enter(() async {});
   menu('git', () {
     dtkGitMenu();
@@ -19,6 +24,6 @@ void dtkMenu() {
     dtkDepMenu();
   });
   menu('prj', () {
-    dtkPrjMenu();
+    dtkPrjMenu(path: path);
   });
 }
