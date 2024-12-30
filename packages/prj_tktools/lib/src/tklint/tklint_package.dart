@@ -102,6 +102,10 @@ class TkLintPackage {
         if (!fromInclude) {
           rules.merge(includeRules);
         }
+      } else {
+        if (verbose) {
+          stdout.writeln('no include for $analysisOptionsPath');
+        }
       }
     }
     var rawRules = yaml.getKeyPathValue(['linter', 'rules']);
@@ -122,8 +126,8 @@ class TkLintPackage {
       }
     }
     rules.sort();
-    if (fromInclude) {
-      rules.removeDifferentRules(includeRules!);
+    if (fromInclude && includeRules != null) {
+      rules.removeDifferentRules(includeRules);
     }
     return rules;
   }
