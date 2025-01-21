@@ -79,9 +79,9 @@ class TkLintPackage {
     handleInclude ??= false;
     fromInclude ??= false;
     var analysisOptionsPath = _fixPath(path);
-    late Map yaml;
+    late Object? yaml;
     try {
-      yaml = loadYaml(await File(analysisOptionsPath).readAsString()) as Map;
+      yaml = loadYaml(await File(analysisOptionsPath).readAsString());
     } catch (e) {
       if (verbose) {
         stdout.writeln('Error reading $analysisOptionsPath: $e');
@@ -91,43 +91,47 @@ class TkLintPackage {
 
     TkLintRules? includeRules;
     var rules = TkLintRules();
-    if (handleInclude) {
-      var include = yaml.getKeyPathValue(['include'])?.toString();
-      if (include != null) {
-        var resolvedInclude = await resolvePath(include);
-        if (verbose) {
-          stdout.writeln('handle include: $include ($resolvedInclude)');
-        }
-        includeRules = await getRules(resolvedInclude, handleInclude: true);
-        if (!fromInclude) {
-          rules.merge(includeRules);
-        }
-      } else {
-        if (verbose) {
-          stdout.writeln('no include for $analysisOptionsPath');
-        }
-      }
-    }
-    var rawRules = yaml.getKeyPathValue(['linter', 'rules']);
 
-    if (rawRules is List) {
-      for (var rawRule in rawRules) {
-        if (rawRule is String) {
-          rules.add(TkLintRule(rawRule, true));
+    /// yaml could be null if there is no content
+    if (yaml is Map) {
+      if (handleInclude) {
+        var include = yaml.getKeyPathValue(['include'])?.toString();
+        if (include != null) {
+          var resolvedInclude = await resolvePath(include);
+          if (verbose) {
+            stdout.writeln('handle include: $include ($resolvedInclude)');
+          }
+          includeRules = await getRules(resolvedInclude, handleInclude: true);
+          if (!fromInclude) {
+            rules.merge(includeRules);
+          }
+        } else {
+          if (verbose) {
+            stdout.writeln('no include for $analysisOptionsPath');
+          }
         }
       }
-    } else if (rawRules is Map) {
-      for (var entry in rawRules.entries) {
-        var rule = entry.key as String;
-        var value = entry.value;
-        if (value is bool) {
-          rules.add(TkLintRule(rule, value));
+      var rawRules = yaml.getKeyPathValue(['linter', 'rules']);
+
+      if (rawRules is List) {
+        for (var rawRule in rawRules) {
+          if (rawRule is String) {
+            rules.add(TkLintRule(rawRule, true));
+          }
+        }
+      } else if (rawRules is Map) {
+        for (var entry in rawRules.entries) {
+          var rule = entry.key as String;
+          var value = entry.value;
+          if (value is bool) {
+            rules.add(TkLintRule(rule, value));
+          }
         }
       }
-    }
-    rules.sort();
-    if (fromInclude && includeRules != null) {
-      rules.removeDifferentRules(includeRules);
+      rules.sort();
+      if (fromInclude && includeRules != null) {
+        rules.removeDifferentRules(includeRules);
+      }
     }
     return rules;
   }

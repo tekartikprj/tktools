@@ -82,10 +82,10 @@ Fix rules overrides over another file
 
   @override
   FutureOr<bool> onRun() async {
-    var verbose = this.verbose;
     var rest = results.rest;
     var include = results.option('include');
     var recursive = results.flag('recursive');
+    var verbose = results.flag('verbose') || this.verbose;
     String? analysisOptionsPath;
     if (rest.isNotEmpty) {
       analysisOptionsPath = rest.first;
