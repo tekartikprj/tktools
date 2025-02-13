@@ -61,7 +61,9 @@ extension DtkDepConfigDbExt on DtkConfigDb {
 
   /// set/update a Dependency
   Future<DbDtkDepDependency> setDependency(
-      String id, DbDtkDepDependency dependency) async {
+    String id,
+    DbDtkDepDependency dependency,
+  ) async {
     return await dtkDepDbDependencyStore.record(id).put(db, dependency);
   }
 
@@ -85,16 +87,19 @@ extension DtkDepConfigDbExt on DtkConfigDb {
 }
 
 /// Dependency store
-var dtkDepDbDependencyStore =
-    cvStringStoreFactory.store<DbDtkDepDependency>('dependency');
+var dtkDepDbDependencyStore = cvStringStoreFactory.store<DbDtkDepDependency>(
+  'dependency',
+);
 
 /// Config store
-var dtkDepDbConfigStore =
-    cvStringStoreFactory.store<DbRecord<String>>('config');
+var dtkDepDbConfigStore = cvStringStoreFactory.store<DbRecord<String>>(
+  'config',
+);
 
 /// Config ref record.
-var dtkDepDbConfigRefRecord =
-    dtkDepDbConfigStore.cast<String, DbDtkDepConfigRef>().record('ref');
+var dtkDepDbConfigRefRecord = dtkDepDbConfigStore
+    .cast<String, DbDtkDepConfigRef>()
+    .record('ref');
 
 late String _configExportPath;
 var _initialized = false;
@@ -109,7 +114,8 @@ Future<String> _dtkGetDepConfigExportPath({String? configExportPath}) async {
 
     if (configExportPath == null) {
       throw StateError(
-          'Git config db not initialized, set global prefs $dtkDepExportPathGlobalPrefsKey');
+        'Git config db not initialized, set global prefs $dtkDepExportPathGlobalPrefsKey',
+      );
     } else {
       _configExportPath = configExportPath;
       _initialized = true;
@@ -120,12 +126,21 @@ Future<String> _dtkGetDepConfigExportPath({String? configExportPath}) async {
 }
 
 /// tkpub action on db, import & export
-Future<T> dtkDepConfigDbAction<T>(Future<T> Function(DtkDepConfigDb db) action,
-    {bool? write, String? configExportPath, bool? verbose}) async {
-  var exportPath =
-      await _dtkGetDepConfigExportPath(configExportPath: configExportPath);
-  return await dtkConfigDbAction(action,
-      exportPath: exportPath, write: write, verbose: verbose);
+Future<T> dtkDepConfigDbAction<T>(
+  Future<T> Function(DtkDepConfigDb db) action, {
+  bool? write,
+  String? configExportPath,
+  bool? verbose,
+}) async {
+  var exportPath = await _dtkGetDepConfigExportPath(
+    configExportPath: configExportPath,
+  );
+  return await dtkConfigDbAction(
+    action,
+    exportPath: exportPath,
+    write: write,
+    verbose: verbose,
+  );
 }
 
 /// Get all Dependencies

@@ -189,15 +189,18 @@ class DtkStatusDb {
 
   CvQueryRef<int, DbDtkTimepoint> get _timepointQueryRef =>
       dbDtkTimepointStore.query(
-          finder: Finder(sortOrders: [
-        SortOrder(dbDtkTimepointModel.timestamp.name, false)
-      ]));
+        finder: Finder(
+          sortOrders: [SortOrder(dbDtkTimepointModel.timestamp.name, false)],
+        ),
+      );
   Future<DbDtkTimepoint?> _getLastTimepoint(Transaction txn) async {
     return await _timepointQueryRef.getRecord(txn);
   }
 
-  Future<DbDtkTimepoint> _getOrCreateLastTimepoint(Transaction txn,
-      {Timestamp? now}) async {
+  Future<DbDtkTimepoint> _getOrCreateLastTimepoint(
+    Transaction txn, {
+    Timestamp? now,
+  }) async {
     return await _timepointQueryRef.getRecord(txn) ??
         _createTimepoint(txn, now: now);
   }
@@ -208,35 +211,49 @@ class DtkStatusDb {
   }
 
   /// Find when done for sub task
-  Future<DbDtkActionFindDartProject> getFindDartProjectAction(
-      {required String repo}) async {
-    return (await findAction<DbDtkActionFindDartProject>(actionFindDartProjects,
-        model: DbDtkActionFindDartProject()..repo.v = repo))!;
+  Future<DbDtkActionFindDartProject> getFindDartProjectAction({
+    required String repo,
+  }) async {
+    return (await findAction<DbDtkActionFindDartProject>(
+      actionFindDartProjects,
+      model: DbDtkActionFindDartProject()..repo.v = repo,
+    ))!;
   }
 
   /// Find actions
-  Future<T?> findAction<T extends DbDtkAction>(String action,
-      {T? model}) async {
+  Future<T?> findAction<T extends DbDtkAction>(
+    String action, {
+    T? model,
+  }) async {
     return await db.transaction((txn) async {
       var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
       Filter? filter;
       if (model != null) {
         filter = _filterFromModel(model as DbDtkAction);
       }
-      return (await _findActions<T>(txn, timepointId, action, filter: filter))
-          .firstOrNull;
+      return (await _findActions<T>(
+        txn,
+        timepointId,
+        action,
+        filter: filter,
+      )).firstOrNull;
     });
   }
 
   Future<T> _createAction<T extends DbDtkAction>(
-      Transaction txn, int timepointId, String action,
-      {required bool main, T? model}) async {
-    var newAction = cvNewModel<T>()
-      ..action.v = action
-      ..timepoint.v = timepointId
-      ..timestamp.v = Timestamp.now()
-      ..status.v = actionResultNone
-      ..main.v = main;
+    Transaction txn,
+    int timepointId,
+    String action, {
+    required bool main,
+    T? model,
+  }) async {
+    var newAction =
+        cvNewModel<T>()
+          ..action.v = action
+          ..timepoint.v = timepointId
+          ..timestamp.v = Timestamp.now()
+          ..status.v = actionResultNone
+          ..main.v = main;
     if (model != null) {
       /// Copy fields
       for (var field in model.fields) {
@@ -265,8 +282,11 @@ class DtkStatusDb {
   }
 
   /// Find or create action
-  Future<T> findOrCreateAction<T extends DbDtkAction>(String action,
-      {Filter? filter, T? model}) async {
+  Future<T> findOrCreateAction<T extends DbDtkAction>(
+    String action, {
+    Filter? filter,
+    T? model,
+  }) async {
     return await db.transaction((txn) async {
       var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
 
@@ -274,12 +294,21 @@ class DtkStatusDb {
         filter = _filterFromModel(model);
       }
       var foundAction =
-          (await _findActions<T>(txn, timepointId, action, filter: filter))
-              .firstOrNull;
+          (await _findActions<T>(
+            txn,
+            timepointId,
+            action,
+            filter: filter,
+          )).firstOrNull;
 
       return foundAction ??
-          _createAction<T>(txn, timepointId, action,
-              main: filter == null && model == null, model: model);
+          _createAction<T>(
+            txn,
+            timepointId,
+            action,
+            main: filter == null && model == null,
+            model: model,
+          );
     });
   }
 
@@ -293,20 +322,25 @@ class DtkStatusDb {
 
   /// Find actions
   Future<List<T>> _findActions<T extends DbDtkAction>(
-      Transaction txn, int timepointId, String action,
-      {Filter? filter}) async {
+    Transaction txn,
+    int timepointId,
+    String action, {
+    Filter? filter,
+  }) async {
     var actions = await dbDtkActionStore
         .castV<T>()
         .query(
-            finder: Finder(
-                filter: Filter.and([
-          Filter.equals(dbDtkActionModel.timepoint.name, timepointId),
-          Filter.equals(dbDtkActionModel.action.name, action),
-          if (filter != null)
-            filter
-          else
-            Filter.equals(dbDtkActionModel.main.name, true),
-        ])))
+          finder: Finder(
+            filter: Filter.and([
+              Filter.equals(dbDtkActionModel.timepoint.name, timepointId),
+              Filter.equals(dbDtkActionModel.action.name, action),
+              if (filter != null)
+                filter
+              else
+                Filter.equals(dbDtkActionModel.main.name, true),
+            ]),
+          ),
+        )
         .getRecords(txn);
     return actions;
   }
@@ -332,7 +366,9 @@ class DtkStatusDb {
 
   Future<void> _setCurrentTimepointId(Transaction txn, int? id) async {
     await dbDtkStatusConfigRecord.put(
-        txn, DbDtkStatusConfig()..currentTimepoint.v = id);
+      txn,
+      DbDtkStatusConfig()..currentTimepoint.v = id,
+    );
   }
 
   /// Set the current timepoint
@@ -352,22 +388,34 @@ class DtkStatusDb {
   }
 
   /// Delete a Repository
-  Future<DbDtkTimepoint> createTimepoint(
-      {Timestamp? now, String? tagFilter, List<String>? dependencies}) async {
+  Future<DbDtkTimepoint> createTimepoint({
+    Timestamp? now,
+    String? tagFilter,
+    List<String>? dependencies,
+  }) async {
     return await db.transaction((txn) async {
-      return await _createTimepoint(txn,
-          now: now, tagFilter: tagFilter, dependencies: dependencies);
+      return await _createTimepoint(
+        txn,
+        now: now,
+        tagFilter: tagFilter,
+        dependencies: dependencies,
+      );
     });
   }
 
   /// Delete a Repository
-  Future<DbDtkTimepoint> _createTimepoint(Transaction txn,
-      {Timestamp? now, String? tagFilter, List<String>? dependencies}) async {
+  Future<DbDtkTimepoint> _createTimepoint(
+    Transaction txn, {
+    Timestamp? now,
+    String? tagFilter,
+    List<String>? dependencies,
+  }) async {
     now ??= Timestamp.now();
-    var record = DbDtkTimepoint()
-      ..timestamp.v = now
-      ..tagFilter.setValue(tagFilter)
-      ..dependencies.setValue(dependencies);
+    var record =
+        DbDtkTimepoint()
+          ..timestamp.v = now
+          ..tagFilter.setValue(tagFilter)
+          ..dependencies.setValue(dependencies);
     var timepoint = await dbDtkTimepointStore.add(txn, record);
     await _setCurrentTimepointId(txn, timepoint.id);
     return timepoint;
@@ -384,20 +432,30 @@ class DtkStatusDb {
   }
 
   /// Delete timepoints
-  Future<int> deleteTimepoints(
-      {int? beforeId, Timestamp? beforeTimestamp}) async {
+  Future<int> deleteTimepoints({
+    int? beforeId,
+    Timestamp? beforeTimestamp,
+  }) async {
     return await db.transaction((txn) async {
       /// Find the before timestamp
-      beforeTimestamp ??= beforeId != null
-          ? (await dbDtkTimepointStore.record(beforeId).get(txn))?.timestamp.v
-          : null;
+      beforeTimestamp ??=
+          beforeId != null
+              ? (await dbDtkTimepointStore
+                  .record(beforeId)
+                  .get(txn))?.timestamp.v
+              : null;
       if (beforeTimestamp == null) {
         return 0;
       }
-      var timepoints = await dbDtkTimepointStore.find(txn,
-          finder: Finder(
-              filter: Filter.lessThan(
-                  dbDtkTimepointModel.timestamp.name, beforeTimestamp)));
+      var timepoints = await dbDtkTimepointStore.find(
+        txn,
+        finder: Finder(
+          filter: Filter.lessThan(
+            dbDtkTimepointModel.timestamp.name,
+            beforeTimestamp,
+          ),
+        ),
+      );
       for (var timepoint in timepoints) {
         await dbDtkTimepointStore.record(timepoint.id).delete(txn);
         // TODO delete other things
@@ -422,7 +480,9 @@ class DtkStatusDb {
       var currentTimepointId = await _getConfigCurrentTimepointId(txn);
       if (currentTimepointId == id) {
         await dbDtkStatusConfigRecord.put(
-            txn, DbDtkStatusConfig()..currentTimepoint.v = null);
+          txn,
+          DbDtkStatusConfig()..currentTimepoint.v = null,
+        );
       }
       await dbDtkTimepointStore.record(id).delete(txn);
     });
@@ -436,12 +496,14 @@ var dbDtkTimepointStore = cvIntStoreFactory.store<DbDtkTimepoint>('timepoint');
 var dbDtkActionStore = cvIntStoreFactory.store<DbDtkAction>('action');
 
 /// Config store
-var dbDtkStatusConfigStore =
-    cvStringStoreFactory.store<DbDtkStatusConfig>('config');
+var dbDtkStatusConfigStore = cvStringStoreFactory.store<DbDtkStatusConfig>(
+  'config',
+);
 
 /// Config record
 var dbDtkStatusConfigRecord = dbDtkStatusConfigStore.record('config');
 
 /// Config record
-var dbDtkExecutionConfigRecord =
-    dbDtkStatusConfigStore.castV<DbDtkExecutionConfig>().record('execution');
+var dbDtkExecutionConfigRecord = dbDtkStatusConfigStore
+    .castV<DbDtkExecutionConfig>()
+    .record('execution');

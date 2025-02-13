@@ -81,7 +81,8 @@ extension DtkGitConfigDbExt on DtkConfigDb {
 
   /// set/update a Repository
   Future<DbDtkGitRepository> setRepository(
-      DbDtkGitRepository repository) async {
+    DbDtkGitRepository repository,
+  ) async {
     var id =
         repository.idOrNull ?? dtkGitUniqueNameFromUrl(repository.gitUrl.v!);
     return await dtkGitDbRepositoryStore.record(id).put(db, repository);
@@ -112,16 +113,19 @@ extension DtkGitConfigDbExt on DtkConfigDb {
 }
 
 /// Repository store
-var dtkGitDbRepositoryStore =
-    cvStringStoreFactory.store<DbDtkGitRepository>('repository');
+var dtkGitDbRepositoryStore = cvStringStoreFactory.store<DbDtkGitRepository>(
+  'repository',
+);
 
 /// Config store
-var dtkGitDbConfigStore =
-    cvStringStoreFactory.store<DbRecord<String>>('config');
+var dtkGitDbConfigStore = cvStringStoreFactory.store<DbRecord<String>>(
+  'config',
+);
 
 /// Config ref record.
-var dtkGitDbConfigRefRecord =
-    dtkGitDbConfigStore.cast<String, DbDtkGitConfigRef>().record('ref');
+var dtkGitDbConfigRefRecord = dtkGitDbConfigStore
+    .cast<String, DbDtkGitConfigRef>()
+    .record('ref');
 
 late String _configExportPath;
 var _initialized = false;
@@ -136,7 +140,8 @@ Future<String> _dtkGetGitConfigExportPath({String? configExportPath}) async {
 
     if (configExportPath == null) {
       throw StateError(
-          'Git config db not initialized, set global prefs $dtkGitExportPathGlobalPrefsKey');
+        'Git config db not initialized, set global prefs $dtkGitExportPathGlobalPrefsKey',
+      );
     } else {
       _configExportPath = configExportPath;
       _initialized = true;
@@ -147,24 +152,35 @@ Future<String> _dtkGetGitConfigExportPath({String? configExportPath}) async {
 }
 
 /// tkpub action on db, import & export
-Future<T> dtkGitConfigDbAction<T>(Future<T> Function(DtkGitConfigDb db) action,
-    {bool? write, String? configExportPath, bool? verbose}) async {
-  var exportPath =
-      await _dtkGetGitConfigExportPath(configExportPath: configExportPath);
-  return await dtkConfigDbAction(action,
-      exportPath: exportPath, write: write, verbose: verbose);
+Future<T> dtkGitConfigDbAction<T>(
+  Future<T> Function(DtkGitConfigDb db) action, {
+  bool? write,
+  String? configExportPath,
+  bool? verbose,
+}) async {
+  var exportPath = await _dtkGetGitConfigExportPath(
+    configExportPath: configExportPath,
+  );
+  return await dtkConfigDbAction(
+    action,
+    exportPath: exportPath,
+    write: write,
+    verbose: verbose,
+  );
 }
 
 /// Get all repositories
-Future<List<DbDtkGitRepository>> dtkGitGetAllRepositories(
-    {String? tagFilter}) async {
+Future<List<DbDtkGitRepository>> dtkGitGetAllRepositories({
+  String? tagFilter,
+}) async {
   return await dtkGitConfigDbAction((db) async {
     var allRepos = await dtkGitDbRepositoryStore.query().getRecords(db.db);
     if (tagFilter != null) {
       var tagsCondition = TagsCondition(tagFilter);
-      allRepos = allRepos
-          .where((repo) => tagsCondition.check(Tags.fromList(repo.tags.v)))
-          .toList();
+      allRepos =
+          allRepos
+              .where((repo) => tagsCondition.check(Tags.fromList(repo.tags.v)))
+              .toList();
     }
     return allRepos;
   });

@@ -14,16 +14,20 @@ const optionDestinationDir = 'dir';
 class TkPubCopyFilesCommand extends TkPubSubCommand {
   /// Clear
   TkPubCopyFilesCommand()
-      : super(
-            name: 'copy_files',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'copy_files',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
 Copy file from package
 
 tkpub copy_files package file1 [file2 file3...] [--dir destination_dir]
-      ''') {
-    parser.addOption(optionDestinationDir,
-        help: 'Output folder', defaultsTo: join('lib', 'src', 'imported'));
+      ''',
+      ) {
+    parser.addOption(
+      optionDestinationDir,
+      help: 'Output folder',
+      defaultsTo: join('lib', 'src', 'imported'),
+    );
   }
 
   @override
@@ -46,9 +50,10 @@ tkpub copy_files package file1 [file2 file3...] [--dir destination_dir]
     var githubTop = normalize(absolute(findGithubTop(path)));
 
     var dependencyLocalPath = getDependencyLocalPath(
-        githubTop: githubTop,
-        gitUrl: package.gitUrl.v!,
-        gitPath: package.gitPath.v);
+      githubTop: githubTop,
+      gitUrl: package.gitUrl.v!,
+      gitPath: package.gitPath.v,
+    );
     stdout.writeln('${package.id} $dependencyLocalPath');
 
     var destinationDir = results.option(optionDestinationDir)!;

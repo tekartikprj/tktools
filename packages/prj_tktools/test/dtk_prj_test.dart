@@ -12,8 +12,12 @@ import 'package:test/test.dart';
 Future<void> main() async {
   group('dtk', () {
     test('DtkProject create workspace and project', () async {
-      var topDir = join('.dart_tool', 'tekartik_prj_tktools', 'test',
-          'dtk_workspace_pubspec_overrides');
+      var topDir = join(
+        '.dart_tool',
+        'tekartik_prj_tktools',
+        'test',
+        'dtk_workspace_pubspec_overrides',
+      );
       var projectDir = join(topDir, 'packages', 'project');
       var prjTop = DtkProject(topDir);
       var prj = DtkProject(projectDir);

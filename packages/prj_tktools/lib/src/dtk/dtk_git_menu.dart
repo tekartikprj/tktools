@@ -82,31 +82,41 @@ class DtkDartProjectActionRunner
     for (var repo in repos) {
       var findDartProjectAction = await db.getFindDartProjectAction(repo: repo);
       for (var path in findDartProjectAction.dartProjects.v!) {
-        futures.add(_pool.withResource(() async {
-          await shellStdioLinesGrouper.runZoned(() async {
-            var dbRepoPath = join(repo, path);
-            var projectPath = join(gitTop, dbRepoPath);
+        futures.add(
+          _pool.withResource(() async {
+            await shellStdioLinesGrouper.runZoned(() async {
+              var dbRepoPath = join(repo, path);
+              var projectPath = join(gitTop, dbRepoPath);
 
-            var pubUpgradeAction =
-                await db.findOrCreateAction<DbDtkActionPubUpgrade>(action,
-                    model: DbDtkActionPubUpgrade()..path.v = dbRepoPath);
-            if (pubUpgradeAction.status.v == actionResultOk) {
-              return;
-            }
-            if (action == actionPubUpgrade) {
-              await packageRunCi(projectPath,
-                  options: PackageRunCiOptions(pubUpgradeOnly: true));
-            } else if (action == actionAnalyze) {
-              await packageRunCi(projectPath,
-                  options:
-                      PackageRunCiOptions(analyzeOnly: true, noPubGet: true));
-            }
+              var pubUpgradeAction = await db
+                  .findOrCreateAction<DbDtkActionPubUpgrade>(
+                    action,
+                    model: DbDtkActionPubUpgrade()..path.v = dbRepoPath,
+                  );
+              if (pubUpgradeAction.status.v == actionResultOk) {
+                return;
+              }
+              if (action == actionPubUpgrade) {
+                await packageRunCi(
+                  projectPath,
+                  options: PackageRunCiOptions(pubUpgradeOnly: true),
+                );
+              } else if (action == actionAnalyze) {
+                await packageRunCi(
+                  projectPath,
+                  options: PackageRunCiOptions(
+                    analyzeOnly: true,
+                    noPubGet: true,
+                  ),
+                );
+              }
 
-            pubUpgradeAction.status.v = actionResultOk;
-            await pubUpgradeAction.put(db.db);
-            stdout.writeln(pubUpgradeAction);
-          });
-        }));
+              pubUpgradeAction.status.v = actionResultOk;
+              await pubUpgradeAction.put(db.db);
+              stdout.writeln(pubUpgradeAction);
+            });
+          }),
+        );
       }
     }
     await Future.wait(futures);
@@ -125,7 +135,7 @@ class DtkFindDartProjectActionRunner
     extends DtkActionRunner<DbDtkActionFindDartProject> {
   /// constructor
   DtkFindDartProjectActionRunner(super.db)
-      : super(action: actionFindDartProjects);
+    : super(action: actionFindDartProjects);
 
   @override
   Future<void> run({bool noReport = false}) async {
@@ -141,19 +151,25 @@ class DtkFindDartProjectActionRunner
     var timepoint = await db.getCurrentTimepoint();
     stdout.writeln('timepoint: $timepoint');
     for (var repo in repos) {
-      var findDartProjectAction =
-          await db.findOrCreateAction<DbDtkActionFindDartProject>(action,
-              filter: Filter.equals(
-                  dbDtkActionFindDartProjectModel.repo.name, repo),
-              model: DbDtkActionFindDartProject()..repo.v = repo);
+      var findDartProjectAction = await db
+          .findOrCreateAction<DbDtkActionFindDartProject>(
+            action,
+            filter: Filter.equals(
+              dbDtkActionFindDartProjectModel.repo.name,
+              repo,
+            ),
+            model: DbDtkActionFindDartProject()..repo.v = repo,
+          );
       if (findDartProjectAction.status.v == actionResultOk) {
         continue;
       }
       var gitProjectTop = join(gitTop, repo);
-      var paths = (await recursivePubPath([gitProjectTop],
-              dependencies: timepoint?.dependencies.v, readConfig: true))
-          .map((path) => relative(path, from: gitProjectTop))
-          .toList();
+      var paths =
+          (await recursivePubPath(
+            [gitProjectTop],
+            dependencies: timepoint?.dependencies.v,
+            readConfig: true,
+          )).map((path) => relative(path, from: gitProjectTop)).toList();
       stdout.writeln('repo $repo: $paths');
 
       findDartProjectAction.dartProjects.v = paths;
@@ -174,8 +190,9 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
 
   @override
   Future<void> run({bool noReport = false}) async {
-    var findRepoAction =
-        await db.findOrCreateAction<DbDtkActionFindRepos>(action);
+    var findRepoAction = await db.findOrCreateAction<DbDtkActionFindRepos>(
+      action,
+    );
     if (findRepoAction.status.v == actionResultOk) {
       if (!noReport) {
         stdout.writeln('find repos already done');
@@ -187,8 +204,9 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
 
     var timepoint = await db.getCurrentTimepoint();
     stdout.writeln('timepoint: $timepoint');
-    var repos =
-        await dtkGitGetAllRepositories(tagFilter: timepoint?.tagFilter.v);
+    var repos = await dtkGitGetAllRepositories(
+      tagFilter: timepoint?.tagFilter.v,
+    );
     var foundRepos = <String>[];
     for (var repo in repos) {
       var repoPath = repo.id;
@@ -249,18 +267,24 @@ void dtkGitMenu() {
         actionFindDartProjects,
         actionFindRepos,
         actionPubUpgrade,
-        actionAnalyze
+        actionAnalyze,
       ]) {
         item('clear action $action', () async {
-          await dbDtkActionStore.delete(db.db,
-              finder: Finder(
-                  filter: Filter.equals(dbDtkActionModel.action.name, action)));
+          await dbDtkActionStore.delete(
+            db.db,
+            finder: Finder(
+              filter: Filter.equals(dbDtkActionModel.action.name, action),
+            ),
+          );
         });
       }
       item('clear main actions', () async {
-        await dbDtkActionStore.delete(db.db,
-            finder: Finder(
-                filter: Filter.equals(dbDtkActionModel.main.name, true)));
+        await dbDtkActionStore.delete(
+          db.db,
+          finder: Finder(
+            filter: Filter.equals(dbDtkActionModel.main.name, true),
+          ),
+        );
       });
     });
   });
@@ -278,7 +302,8 @@ void dtkGitMenu() {
         var config = await db.getConfig();
         var defaultTagFilter = config?.defaultTagFilter.v?.nonEmpty() ?? '*';
         var tagFilter = await prompt(
-            'default tag filter (default: $defaultTagFilter, * for all)');
+          'default tag filter (default: $defaultTagFilter, * for all)',
+        );
         if (tagFilter.nonEmpty() == null) {
           tagFilter = defaultTagFilter;
         }
@@ -300,8 +325,10 @@ void dtkGitMenu() {
         return dependencies;
       }
 
-      String? tagFilterFromString(String tagFilter,
-          {String? defaultTagFilter}) {
+      String? tagFilterFromString(
+        String tagFilter, {
+        String? defaultTagFilter,
+      }) {
         var tagFilterOrNull = tagFilter.trimmedNonEmpty() ?? defaultTagFilter;
         if (tagFilterOrNull == '*') {
           tagFilterOrNull = null;
@@ -313,16 +340,21 @@ void dtkGitMenu() {
         var config = await db.getConfig();
         var defaultTagFilter = config?.defaultTagFilter.v?.nonEmpty() ?? '*';
 
-        var tagFilter =
-            await prompt('tag filter (default: $defaultTagFilter, * for all)');
-        var tagFilterOrNull =
-            tagFilterFromString(tagFilter, defaultTagFilter: defaultTagFilter);
+        var tagFilter = await prompt(
+          'tag filter (default: $defaultTagFilter, * for all)',
+        );
+        var tagFilterOrNull = tagFilterFromString(
+          tagFilter,
+          defaultTagFilter: defaultTagFilter,
+        );
 
         var deps = await prompt('deps (comma separated)');
         var dependencies = dependenciesFromString(deps);
 
         var timepoint = await db.createTimepoint(
-            tagFilter: tagFilterOrNull, dependencies: dependencies);
+          tagFilter: tagFilterOrNull,
+          dependencies: dependencies,
+        );
         write(timepoint);
       });
       Future<void> listTimepoints() async {
@@ -343,17 +375,25 @@ void dtkGitMenu() {
           } else {
             var defaultTagFilter = timepoint.tagFilter.v?.nonEmpty() ?? '*';
             var tagFilter = await prompt(
-                'tag filter (default: $defaultTagFilter, * for all)');
-            var tagFilterOrNull = tagFilterFromString(tagFilter,
-                defaultTagFilter: defaultTagFilter);
+              'tag filter (default: $defaultTagFilter, * for all)',
+            );
+            var tagFilterOrNull = tagFilterFromString(
+              tagFilter,
+              defaultTagFilter: defaultTagFilter,
+            );
             var deps = await prompt('deps (comma separated)');
-            var dependencies = dependenciesFromString(deps,
-                defaultDeps: timepoint.dependencies.v?.join(','));
-            timepoint = await dbDtkTimepointStore.record(id).put(
-                db.db,
-                timepoint
-                  ..tagFilter.v = tagFilterOrNull
-                  ..dependencies.v = dependencies);
+            var dependencies = dependenciesFromString(
+              deps,
+              defaultDeps: timepoint.dependencies.v?.join(','),
+            );
+            timepoint = await dbDtkTimepointStore
+                .record(id)
+                .put(
+                  db.db,
+                  timepoint
+                    ..tagFilter.v = tagFilterOrNull
+                    ..dependencies.v = dependencies,
+                );
 
             write('updated $timepoint');
           }
@@ -427,7 +467,8 @@ void dtkGitMenu() {
       });
       item('add by unique name (prompt)', () async {
         var id = await prompt(
-            'unique name (example: github.com/tekartik/app_common_utils.dart)');
+          'unique name (example: github.com/tekartik/app_common_utils.dart)',
+        );
         if (id.nonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
             var repo = await db.getRepositoryOrNull(id);
@@ -440,8 +481,8 @@ void dtkGitMenu() {
                 return;
               }
             }
-            repo ??= DbDtkGitRepository()
-              ..ref = dtkGitDbRepositoryStore.record(id);
+            repo ??=
+                DbDtkGitRepository()..ref = dtkGitDbRepositoryStore.record(id);
 
             var tags = await prompt('tags');
             if (tags.nonEmpty() != null) {
@@ -519,7 +560,9 @@ void dtkGitMenu() {
         var exportPath = await prompt('export path');
         if (exportPath.trimmedNonEmpty() != null) {
           await prefs.setString(
-              dtkGitExportPathGlobalPrefsKey, absolute(normalize(exportPath)));
+            dtkGitExportPathGlobalPrefsKey,
+            absolute(normalize(exportPath)),
+          );
         }
       });
     });

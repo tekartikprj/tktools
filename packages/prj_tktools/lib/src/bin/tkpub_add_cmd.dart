@@ -36,11 +36,15 @@ class TkPubClearCommand extends TkPubAddRemoveCommand {
 
   /// Clear
   TkPubClearCommand()
-      : super(name: 'clear', parser: ArgParser(allowTrailingOptions: true)) {
-    parser.addFlag(flagPubspecOverridesKey,
-        help: 'Clear pubspec_overrides.yaml');
-    parser.addFlag(flagRecursiveKey,
-        help: 'Go to every subfolder (pubspec-overrides only for now)');
+    : super(name: 'clear', parser: ArgParser(allowTrailingOptions: true)) {
+    parser.addFlag(
+      flagPubspecOverridesKey,
+      help: 'Clear pubspec_overrides.yaml',
+    );
+    parser.addFlag(
+      flagRecursiveKey,
+      help: 'Go to every subfolder (pubspec-overrides only for now)',
+    );
   }
 }
 
@@ -51,13 +55,17 @@ class TkPubRemoveCommand extends TkPubAddRemoveCommand {
 
   /// Pub remove
   TkPubRemoveCommand()
-      : super(name: 'remove', parser: ArgParser(allowTrailingOptions: true)) {
+    : super(name: 'remove', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addFlag(flagDevKey, help: 'Remove from dev_dependencies mode');
     parser.addFlag(flagOverridesKey, help: 'Remove from dependency_overrides');
-    parser.addFlag(flagPubspecOverridesKey,
-        help: 'Remove from pubspec_overrides.yaml');
-    parser.addFlag(flagRecursiveKey,
-        help: 'Go to every subfolder (pubspec-overrides only for now)');
+    parser.addFlag(
+      flagPubspecOverridesKey,
+      help: 'Remove from pubspec_overrides.yaml',
+    );
+    parser.addFlag(
+      flagRecursiveKey,
+      help: 'Go to every subfolder (pubspec-overrides only for now)',
+    );
   }
 }
 
@@ -68,29 +76,47 @@ class TkPubAddCommand extends TkPubAddRemoveCommand {
 
   /// Pub add
   TkPubAddCommand()
-      : super(
-            name: 'add',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'add',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
 tkpub add [dev:|override:|pubspec_overrides:]package1 [package2]
 
 Add package using user env config
-      ''') {
+      ''',
+      ) {
     parser.addFlag(flagDevKey, abbr: 'd', help: 'Add to dev_dependencies mode');
     parser.addFlag(flagDirectKey, help: 'Add to dependencies mode');
-    parser.addFlag(flagOverridesKey,
-        abbr: 'o', help: 'Add to dependency_overrides');
-    parser.addFlag(flagForceKey,
-        abbr: 'f', help: 'Force adding (hosted only or specified)');
-    parser.addFlag(flagPubspecOverridesKey,
-        abbr: 'p', help: 'Add to pubspec_overrides.yaml');
-    parser.addFlag(flagDirectAndPubspecOverridesKey,
-        abbr: 'b', help: 'Add to direct deps and pubspec_overrides.yaml');
-    parser.addFlag(flagRecursiveKey,
-        abbr: 'r',
-        help: 'Go to every subfolder (pubspec-overrides only for now)');
-    parser.addFlag(flagReadConfigKey,
-        abbr: 'c', help: 'Read config instead of filtering by dependencies');
+    parser.addFlag(
+      flagOverridesKey,
+      abbr: 'o',
+      help: 'Add to dependency_overrides',
+    );
+    parser.addFlag(
+      flagForceKey,
+      abbr: 'f',
+      help: 'Force adding (hosted only or specified)',
+    );
+    parser.addFlag(
+      flagPubspecOverridesKey,
+      abbr: 'p',
+      help: 'Add to pubspec_overrides.yaml',
+    );
+    parser.addFlag(
+      flagDirectAndPubspecOverridesKey,
+      abbr: 'b',
+      help: 'Add to direct deps and pubspec_overrides.yaml',
+    );
+    parser.addFlag(
+      flagRecursiveKey,
+      abbr: 'r',
+      help: 'Go to every subfolder (pubspec-overrides only for now)',
+    );
+    parser.addFlag(
+      flagReadConfigKey,
+      abbr: 'c',
+      help: 'Read config instead of filtering by dependencies',
+    );
   }
 }
 
@@ -115,14 +141,16 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
     var recursive = results.flag(flagRecursiveKey);
     var force = isAdd ? results.flag(flagForceKey) : false;
     var readConfig = results.flag(flagReadConfigKey);
-    var directAndPubspecOverrides =
-        results.flag(flagDirectAndPubspecOverridesKey);
+    var directAndPubspecOverrides = results.flag(
+      flagDirectAndPubspecOverridesKey,
+    );
     var globalDirect = results.flag(flagDirectKey);
 
     if (globalOverrides) {
       if (globalOverrides || globalOverrides) {
         throw ArgumentError(
-            'Cannot use --$flagPubspecOverridesKey with --$flagDevKey or --$flagOverridesKey');
+          'Cannot use --$flagPubspecOverridesKey with --$flagDevKey or --$flagOverridesKey',
+        );
       }
     }
 
@@ -132,7 +160,8 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
     }
     if (!isClear && rest.isEmpty) {
       throw ArgumentError(
-          'At least one argument expected (package name with optional target and dev)');
+        'At least one argument expected (package name with optional target and dev)',
+      );
     }
     var verbose = this.verbose;
 
@@ -145,24 +174,26 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
     final topPath = '.';
     if (isClear) {
       var options = TkPubDepsManagerOptions(
-          pubspecOverrides: globalPubspecOverrides,
-          recursive: recursive,
-          verbose: verbose);
+        pubspecOverrides: globalPubspecOverrides,
+        recursive: recursive,
+        verbose: verbose,
+      );
 
       var manager = TkPubDepsManager(path: topPath, options: options);
       await manager.clear();
       return true;
     }
     var options = TkPubDepsManagerOptions(
-        pubspecOverrides: globalPubspecOverrides || directAndPubspecOverrides,
-        directDependencies: globalDirect || directAndPubspecOverrides,
-        devDependencies: globalDev,
-        overrideDependencies: globalOverrides,
-        recursive: recursive,
-        configExportPath: await getConfigExportPath(),
-        readConfig: readConfig,
-        verbose: verbose,
-        force: force);
+      pubspecOverrides: globalPubspecOverrides || directAndPubspecOverrides,
+      directDependencies: globalDirect || directAndPubspecOverrides,
+      devDependencies: globalDev,
+      overrideDependencies: globalOverrides,
+      recursive: recursive,
+      configExportPath: await getConfigExportPath(),
+      readConfig: readConfig,
+      verbose: verbose,
+      force: force,
+    );
     var manager = TkPubDepsManager(path: topPath, options: options);
     if (isAdd) {
       await manager.add(rest);

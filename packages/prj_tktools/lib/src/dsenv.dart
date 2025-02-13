@@ -4,8 +4,10 @@ import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_crypto/encrypt.dart';
 import 'package:tekartik_app_crypto/password_generator.dart';
 
-ShellEnvironment get _shellEnvironment => ShellEnvironment()
-  ..aliases['dsvar'] = 'dart pub global run process_run:shell env --user var';
+ShellEnvironment get _shellEnvironment =>
+    ShellEnvironment()
+      ..aliases['dsvar'] =
+          'dart pub global run process_run:shell env --user var';
 
 var _processRunGlobalReady = () async {
   await checkAndActivatePackage('process_run');

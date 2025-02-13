@@ -73,8 +73,11 @@ class TkLintPackage {
   /// Get rules
   /// [handleInclude] should be true to list all the rules
   /// [fromInclude] should be true to list the real difference with the included
-  Future<TkLintRules> getRules(String path,
-      {bool? handleInclude, bool? fromInclude}) async {
+  Future<TkLintRules> getRules(
+    String path, {
+    bool? handleInclude,
+    bool? fromInclude,
+  }) async {
     await _initialized;
     handleInclude ??= false;
     fromInclude ??= false;

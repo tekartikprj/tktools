@@ -18,16 +18,21 @@ void dtkDepMenu() {
         }, verbose: true);
       });
       item('set ref (prompt)', () async {
-        var config = await dtkDepConfigDbAction((db) async {
+        var config =
+            await dtkDepConfigDbAction((db) async {
               return await db.getConfig();
             }) ??
             DbDtkDepConfigRef();
         var newRef = await prompt('ref (default: ${config.gitRef.v})');
         if (newRef.isNotEmpty) {
           config.gitRef.v = newRef;
-          await dtkDepConfigDbAction((db) async {
-            await db.setConfig(config);
-          }, write: true, verbose: true);
+          await dtkDepConfigDbAction(
+            (db) async {
+              await db.setConfig(config);
+            },
+            write: true,
+            verbose: true,
+          );
         }
       });
     });
@@ -44,14 +49,18 @@ void dtkDepMenu() {
       item('delete', () async {
         var id = await prompt('dependency to delete');
         if (id.isNotEmpty) {
-          await dtkDepConfigDbAction((db) async {
-            var deleted = await db.deleteDependency(id);
-            if (deleted) {
-              write('deleted');
-            } else {
-              write('not found');
-            }
-          }, write: true, verbose: true);
+          await dtkDepConfigDbAction(
+            (db) async {
+              var deleted = await db.deleteDependency(id);
+              if (deleted) {
+                write('deleted');
+              } else {
+                write('not found');
+              }
+            },
+            write: true,
+            verbose: true,
+          );
         }
       });
 
@@ -65,12 +74,17 @@ void dtkDepMenu() {
           write('$id: $dependency');
           dependency ??= DbDtkDepDependency();
           var minVersion = await prompt(
-              'minVersion${dependency.minVersion.isNotNull ? ' (default: ${dependency.minVersion.v})' : ''}');
+            'minVersion${dependency.minVersion.isNotNull ? ' (default: ${dependency.minVersion.v})' : ''}',
+          );
           if (minVersion.isNotEmpty) {
-            var newDependency = await dtkDepConfigDbAction((db) async {
-              dependency!.minVersion.v = minVersion;
-              return await db.setDependency(id, dependency);
-            }, write: true, verbose: true);
+            var newDependency = await dtkDepConfigDbAction(
+              (db) async {
+                dependency!.minVersion.v = minVersion;
+                return await db.setDependency(id, dependency);
+              },
+              write: true,
+              verbose: true,
+            );
             write(newDependency);
           }
         }

@@ -8,15 +8,19 @@ import 'package:tekartik_prj_tktools/tklint.dart';
 class TklintListRulesCommand extends ShellBinCommand {
   /// Clear
   TklintListRulesCommand()
-      : super(
-            name: 'list-rules',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'list-rules',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
 List rules overrides over another file
-      ''') {
+      ''',
+      ) {
     parser.addFlag('force-any', help: 'List all rules as rule: true|false');
-    parser.addFlag('no-include',
-        help: 'Do not handle included files', negatable: false);
+    parser.addFlag(
+      'no-include',
+      help: 'Do not handle included files',
+      negatable: false,
+    );
     parser.addOption('from', help: 'Added from file/dep');
     parser.addFlag('from-include', help: 'Added from direct include');
   }
@@ -36,12 +40,17 @@ List rules overrides over another file
       analysisOptionsPath = rest.first;
     }
     var package = TkLintPackage('.', verbose: verbose);
-    var rules = await package.getRules(analysisOptionsPath,
-        handleInclude: handleInclude, fromInclude: fromInclude);
+    var rules = await package.getRules(
+      analysisOptionsPath,
+      handleInclude: handleInclude,
+      fromInclude: fromInclude,
+    );
 
     if (from != null) {
-      var fromRules = await package.getRules(await package.resolvePath(from),
-          handleInclude: true);
+      var fromRules = await package.getRules(
+        await package.resolvePath(from),
+        handleInclude: true,
+      );
       rules.removeDifferentRules(fromRules);
     }
     for (var text in rules.toStringList(forceAny: forceAny)) {

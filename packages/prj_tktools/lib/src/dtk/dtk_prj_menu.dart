@@ -56,11 +56,13 @@ void _dtkPrjMenu({required String path}) {
       item('create workspace root project', () async {
         await prj.createWorkspaceRootProject();
       });
-      item('create workspace root project and add sub project to root',
-          () async {
-        await prj.createWorkspaceRootProject();
-        await prj.addAllProjectsToWorkspace();
-      });
+      item(
+        'create workspace root project and add sub project to root',
+        () async {
+          await prj.createWorkspaceRootProject();
+          await prj.addAllProjectsToWorkspace();
+        },
+      );
       item('add to workspace', () async {
         await prj.addToWorkspace();
       });

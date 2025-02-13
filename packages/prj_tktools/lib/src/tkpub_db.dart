@@ -65,8 +65,10 @@ extension TkPubConfigDbExt on TkPubConfigDb {
   }
 
   /// Get a package or null
-  Future<TkPubDbPackage?> getPackageOrNull(String id,
-      {bool? addMissingRef}) async {
+  Future<TkPubDbPackage?> getPackageOrNull(
+    String id, {
+    bool? addMissingRef,
+  }) async {
     var package = await tkPubPackagesStore.record(id).get(db);
     if (package == null) {
       return null;
@@ -104,8 +106,9 @@ var tkPubPackagesStore = cvStringStoreFactory.store<TkPubDbPackage>('packages');
 var configStore = cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
-var tkPubConfigRefRecord =
-    configStore.cast<String, DbConfigRef>().record('ref');
+var tkPubConfigRefRecord = configStore.cast<String, DbConfigRef>().record(
+  'ref',
+);
 
 late String _configExportPath;
 var _initialized = false;
@@ -131,12 +134,21 @@ Future<String> _tkPubGetConfigExportPath({String? configExportPath}) async {
 }
 
 /// tkpub action on db, import & export
-Future<T> tkPubDbAction<T>(Future<T> Function(DtkGitConfigDb db) action,
-    {bool? write, String? configExportPath, bool? verbose}) async {
-  var exportPath =
-      await _tkPubGetConfigExportPath(configExportPath: configExportPath);
-  return dtkConfigDbAction(action,
-      exportPath: exportPath, write: write, verbose: verbose);
+Future<T> tkPubDbAction<T>(
+  Future<T> Function(DtkGitConfigDb db) action, {
+  bool? write,
+  String? configExportPath,
+  bool? verbose,
+}) async {
+  var exportPath = await _tkPubGetConfigExportPath(
+    configExportPath: configExportPath,
+  );
+  return dtkConfigDbAction(
+    action,
+    exportPath: exportPath,
+    write: write,
+    verbose: verbose,
+  );
 }
 
 /// Get all packages

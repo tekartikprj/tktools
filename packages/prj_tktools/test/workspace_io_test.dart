@@ -16,25 +16,29 @@ extension on String {
 
 Future<void> main() async {
   test('workspace pubspec overrides', () async {
-    var workspacePubspec = '''
+    var workspacePubspec =
+        '''
 name: _
 publish_to: none
 environment:
   sdk: ^3.6.0
 workspace:
   - packages/project
-'''
-        .lines;
-    var projectPubspec = '''
+'''.lines;
+    var projectPubspec =
+        '''
 name: tekartik_test_project1
 publish_to: none
 environment:
   sdk: ^3.6.0
 resolution: workspace
-'''
-        .lines;
-    var topDir = join('.dart_tool', 'tekartik_prj_tktools', 'test',
-        'workspace_pubspec_overrides');
+'''.lines;
+    var topDir = join(
+      '.dart_tool',
+      'tekartik_prj_tktools',
+      'test',
+      'workspace_pubspec_overrides',
+    );
     var projectDir = join(topDir, 'packages', 'project');
     await Directory(topDir).emptyOrCreate();
     await File(join(topDir, 'pubspec.yaml')).writeLines(workspacePubspec);

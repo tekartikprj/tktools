@@ -32,22 +32,22 @@ Future<List<String>> getWorkspacePubspecLines() async {
   return _workspacePubspec;
 }
 
-final _workspacePubspec = '''
+final _workspacePubspec =
+    '''
 name: _
 publish_to: none
 environment:
   sdk: ^3.6.0
 workspace:
-'''
-    .lines;
-final _projectPubspec = '''
+'''.lines;
+final _projectPubspec =
+    '''
 name: {{projectName}}
 publish_to: none
 environment:
   sdk: ^3.6.0
 resolution: workspace
-'''
-    .lines;
+'''.lines;
 
 /// Get the pubspec.yaml lines for an empty project
 Future<List<String>> getEmptyProjectPubspecLines({

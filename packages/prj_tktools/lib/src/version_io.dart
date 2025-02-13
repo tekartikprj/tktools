@@ -8,8 +8,13 @@ import 'package:tekartik_prj_tktools/yaml_edit.dart';
 /// Bump the version of a package
 /// If nothing is specified, it will bump the build or prelease number if present
 /// or the patch version if no build or prelease is present.
-Future<void> pathVersionBump(
-    {String? path, bool? patch, bool? minor, bool? major, bool? ext}) async {
+Future<void> pathVersionBump({
+  String? path,
+  bool? patch,
+  bool? minor,
+  bool? major,
+  bool? ext,
+}) async {
   path ??= '.';
   patch ??= false;
   minor ??= false;

@@ -13,8 +13,11 @@ const dtkDepExportPathGlobalPrefsKey = 'com.tekartik.dtk.depExportPath';
 /// common extension
 extension DtkFileExt on File {
   /// Write file at path if needed
-  Future<void> writeLinesIfNeeded(List<String> newLines,
-      {bool? verbose, bool? verboseIfNeeded}) async {
+  Future<void> writeLinesIfNeeded(
+    List<String> newLines, {
+    bool? verbose,
+    bool? verboseIfNeeded,
+  }) async {
     verbose ??= false;
     verboseIfNeeded ??= false;
     var file = this;

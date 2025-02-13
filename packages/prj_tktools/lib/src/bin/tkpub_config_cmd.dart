@@ -37,7 +37,7 @@ abstract class _TkPubConfigSubCommand extends ShellBinCommand {
 
 class _DeleteCommand extends _TkPubConfigSubCommand {
   _DeleteCommand()
-      : super(name: 'delete', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'delete', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
@@ -56,7 +56,7 @@ class _DeleteCommand extends _TkPubConfigSubCommand {
 
 class _SetCommand extends _TkPubConfigSubCommand {
   _SetCommand()
-      : super(name: 'set', parser: ArgParser(allowTrailingOptions: true)) {
+    : super(name: 'set', parser: ArgParser(allowTrailingOptions: true)) {
     parser.addOption(optionGitUrl, help: 'Git url');
     parser.addOption(optionGitPath, help: 'Git path');
     parser.addOption(optionGitRef, help: 'Git ref');
@@ -77,10 +77,11 @@ class _SetCommand extends _TkPubConfigSubCommand {
 
     var packageName = rest.first;
     await tkPubConfigCommand.dbAction((db) async {
-      var package = tkPubPackagesStore.record(packageName).cv()
-        ..gitUrl.v = gitUrl
-        ..gitPath.setValue(gitPath)
-        ..gitRef.setValue(gitRef);
+      var package =
+          tkPubPackagesStore.record(packageName).cv()
+            ..gitUrl.v = gitUrl
+            ..gitPath.setValue(gitPath)
+            ..gitRef.setValue(gitRef);
       await db.setPackage(package.id, package);
       writePackageConfig(package);
     }, write: true);
@@ -90,7 +91,7 @@ class _SetCommand extends _TkPubConfigSubCommand {
 
 class _GetCommand extends _TkPubConfigSubCommand {
   _GetCommand()
-      : super(name: 'get', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'get', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
@@ -103,7 +104,8 @@ class _GetCommand extends _TkPubConfigSubCommand {
     await tkPubConfigCommand.dbAction((db) async {
       var package = await db.getPackage(packageName);
       stdout.writeln(
-          '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
+        '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}',
+      );
     });
     return true;
   }
@@ -112,12 +114,13 @@ class _GetCommand extends _TkPubConfigSubCommand {
 /// Write package config
 void writePackageConfig(TkPubDbPackage package) {
   stdout.writeln(
-      '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
+    '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}',
+  );
 }
 
 class _ListCommand extends _TkPubConfigSubCommand {
   _ListCommand()
-      : super(name: 'list', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'list', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
@@ -125,7 +128,8 @@ class _ListCommand extends _TkPubConfigSubCommand {
       var packages = await tkPubPackagesStore.query().getRecords(db.db);
       for (var package in packages) {
         stdout.writeln(
-            '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}');
+          '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}',
+        );
       }
     });
     return true;
@@ -134,7 +138,7 @@ class _ListCommand extends _TkPubConfigSubCommand {
 
 class _SetRefCommand extends _TkPubConfigSubCommand {
   _SetRefCommand()
-      : super(name: 'set-ref', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'set-ref', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
@@ -153,7 +157,7 @@ class _SetRefCommand extends _TkPubConfigSubCommand {
 
 class _GetRefCommand extends _TkPubConfigSubCommand {
   _GetRefCommand()
-      : super(name: 'get-ref', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'get-ref', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {
@@ -168,9 +172,10 @@ class _GetRefCommand extends _TkPubConfigSubCommand {
 
 class _GetExportPathCommand extends _TkPubConfigSubCommand {
   _GetExportPathCommand()
-      : super(
-            name: 'get-export-path',
-            parser: ArgParser(allowTrailingOptions: true));
+    : super(
+        name: 'get-export-path',
+        parser: ArgParser(allowTrailingOptions: true),
+      );
 
   @override
   FutureOr<bool> onRun() async {

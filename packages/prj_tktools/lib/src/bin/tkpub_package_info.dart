@@ -14,7 +14,7 @@ enum TkPubTarget {
   override,
 
   /// pubspec_overrides: (pubspec_overrides.yaml file)
-  pubspecOverrides
+  pubspecOverrides,
 }
 
 /// Convert target to string

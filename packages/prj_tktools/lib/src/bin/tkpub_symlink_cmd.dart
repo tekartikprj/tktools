@@ -15,16 +15,17 @@ import '../utils.dart';
 class TkPubSymlinkCommand extends TkPubSubCommand {
   /// Clear
   TkPubSymlinkCommand()
-      : super(
-            name: 'symlink',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'symlink',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
 Symlink multiple packages
 
 tkpub symlink package1 [package2]
 
 tkpub symlink giturl1 [giturl2]
-      ''') {
+      ''',
+      ) {
     parser.addFlag(optionGitUrl, help: 'find by git url');
   }
 
@@ -48,19 +49,23 @@ tkpub symlink giturl1 [giturl2]
         }
       }
     }
-    var dbPackages =
-        allDbPackages.where((dbPackage) => (packages.contains(dbPackage.id)));
+    var dbPackages = allDbPackages.where(
+      (dbPackage) => (packages.contains(dbPackage.id)),
+    );
     var githubTop = normalize(absolute(findGithubTop(path)));
     for (var package in dbPackages) {
       var dependencyPath = joinAll([
         getDependencyGithubPath(
-            githubTop: githubTop, gitUrl: package.gitUrl.v!),
-        if (package.gitPath.isNotNull) package.gitPath.v!
-      ]);
-      var dependencyLocalPath = getDependencyLocalPath(
           githubTop: githubTop,
           gitUrl: package.gitUrl.v!,
-          gitPath: package.gitPath.v);
+        ),
+        if (package.gitPath.isNotNull) package.gitPath.v!,
+      ]);
+      var dependencyLocalPath = getDependencyLocalPath(
+        githubTop: githubTop,
+        gitUrl: package.gitUrl.v!,
+        gitPath: package.gitPath.v,
+      );
       var absoluteLinkPath = normalize(absolute(join(path, dependencyPath)));
       stdout.writeln('${package.id} $dependencyPath');
 

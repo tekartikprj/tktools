@@ -5,13 +5,17 @@ Future<void> main() async {
   group('dtk', () {
     test('dtkGitUniqueNameFromUrl', () async {
       expect(
-          dtkGitUniqueNameFromUrl(
-              'git@github.com:tekartik/app_common_utils.dart.git'),
-          'github.com/tekartik/app_common_utils.dart');
+        dtkGitUniqueNameFromUrl(
+          'git@github.com:tekartik/app_common_utils.dart.git',
+        ),
+        'github.com/tekartik/app_common_utils.dart',
+      );
       expect(
-          dtkGitUniqueNameFromUrl(
-              'https://github.com/tekartik/app_common_utils.dart'),
-          'github.com/tekartik/app_common_utils.dart');
+        dtkGitUniqueNameFromUrl(
+          'https://github.com/tekartik/app_common_utils.dart',
+        ),
+        'github.com/tekartik/app_common_utils.dart',
+      );
     });
   });
 }

@@ -81,15 +81,24 @@ String? _findGithubTopOrNull(String dirPath) {
 }
 
 /// Get the local path of a dependency (absolute)
-String getDependencyLocalPath(
-    {required String githubTop, required String gitUrl, String? gitPath}) {
-  var dependencyGithubPath =
-      getDependencyGithubPath(githubTop: githubTop, gitUrl: gitUrl);
-  var dependencyPath = normalize(absolute(joinAll([
-    githubTop,
-    dependencyGithubPath,
-    if (gitPath?.isNotEmpty ?? false) gitPath!
-  ])));
+String getDependencyLocalPath({
+  required String githubTop,
+  required String gitUrl,
+  String? gitPath,
+}) {
+  var dependencyGithubPath = getDependencyGithubPath(
+    githubTop: githubTop,
+    gitUrl: gitUrl,
+  );
+  var dependencyPath = normalize(
+    absolute(
+      joinAll([
+        githubTop,
+        dependencyGithubPath,
+        if (gitPath?.isNotEmpty ?? false) gitPath!,
+      ]),
+    ),
+  );
 
   return dependencyPath;
 }
@@ -112,12 +121,16 @@ String safeGetUrlPath(String url) {
 }
 
 /// Get the github path of a dependency
-String getDependencyGithubPath(
-    {required String githubTop, required String gitUrl}) {
+String getDependencyGithubPath({
+  required String githubTop,
+  required String gitUrl,
+}) {
   var dependencyGithubPath = safeGetUrlPath(gitUrl);
   if (dependencyGithubPath.endsWith('.git')) {
     dependencyGithubPath = dependencyGithubPath.substring(
-        0, dependencyGithubPath.length - '.git'.length);
+      0,
+      dependencyGithubPath.length - '.git'.length,
+    );
   }
   if (dependencyGithubPath.startsWith('/')) {
     dependencyGithubPath = dependencyGithubPath.substring(1);

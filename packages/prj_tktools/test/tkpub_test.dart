@@ -7,21 +7,28 @@ import 'package:test/test.dart';
 void main() {
   test('TkpubPackageInfo', () {
     expect(
-        TkPubPackageInfo.parse('dev:test:{"dummy":"test"}'),
-        TkPubPackageInfo(
-            target: TkPubTarget.dev, name: 'test', def: {'dummy': 'test'}));
+      TkPubPackageInfo.parse('dev:test:{"dummy":"test"}'),
+      TkPubPackageInfo(
+        target: TkPubTarget.dev,
+        name: 'test',
+        def: {'dummy': 'test'},
+      ),
+    );
     expect(TkPubPackageInfo.parse('test'), TkPubPackageInfo(name: 'test'));
     expect(TkPubPackageInfo.parse("'test'"), TkPubPackageInfo(name: 'test'));
-    expect(TkPubPackageInfo.parse('dev:test'),
-        TkPubPackageInfo(target: TkPubTarget.dev, name: 'test'));
+    expect(
+      TkPubPackageInfo.parse('dev:test'),
+      TkPubPackageInfo(target: TkPubTarget.dev, name: 'test'),
+    );
   });
   group('tkpub_db', () {
     test('simple', () async {
       var db = TkPubConfigDb(
-          database: await newDatabaseFactoryMemory().openDatabase('test'));
+        database: await newDatabaseFactoryMemory().openDatabase('test'),
+      );
       db.initBuilders();
-      var package = tkPubPackagesStore.record('pkg1').cv()
-        ..gitUrl.v = 'gitUri1';
+      var package =
+          tkPubPackagesStore.record('pkg1').cv()..gitUrl.v = 'gitUri1';
       var config = tkPubConfigRefRecord.cv()..gitRef.v = 'gitRef1';
 
       await config.put(db.db);

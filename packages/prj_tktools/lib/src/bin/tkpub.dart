@@ -53,22 +53,27 @@ abstract class TkPubSubCommand extends ShellBinCommand {
     return _configExportPath ??= await () async {
       var configExportPath =
           tkPubCommand.results.option(optionsConfigExportPath) ??
-              await tkPubGetConfigExportPath();
+          await tkPubGetConfigExportPath();
       return configExportPath;
     }();
   }
 
   /// Run a db action
-  Future<T> dbAction<T>(Future<T> Function(TkPubConfigDb db) action,
-      {bool? write}) async {
-    return await tkPubDbAction(action,
-        write: write, configExportPath: await getConfigExportPath());
+  Future<T> dbAction<T>(
+    Future<T> Function(TkPubConfigDb db) action, {
+    bool? write,
+  }) async {
+    return await tkPubDbAction(
+      action,
+      write: write,
+      configExportPath: await getConfigExportPath(),
+    );
   }
 }
 
 class _InitCommand extends ShellBinCommand {
   _InitCommand()
-      : super(name: 'init', parser: ArgParser(allowTrailingOptions: true));
+    : super(name: 'init', parser: ArgParser(allowTrailingOptions: true));
 
   @override
   FutureOr<bool> onRun() async {

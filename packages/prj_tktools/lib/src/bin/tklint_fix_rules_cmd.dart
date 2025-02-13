@@ -22,8 +22,11 @@ class TklintFixRulesOptions {
 }
 
 /// Fix rules
-Future<void> tklintFixRules(String path,
-    {String? analysisOptionsPath, TklintFixRulesOptions? options}) async {
+Future<void> tklintFixRules(
+  String path, {
+  String? analysisOptionsPath,
+  TklintFixRulesOptions? options,
+}) async {
   var include = options?.include;
   var verbose = options?.verbose ?? false;
   var package = TkLintPackage(path, verbose: verbose);
@@ -35,8 +38,9 @@ Future<void> tklintFixRules(String path,
     var includePackagePath = await getPubPackageRoot(include);
     var includePackage = TkLintPackage(includePackagePath, verbose: verbose);
     var includeRules = await includePackage.getRules(
-        relative(include, from: includePackagePath),
-        handleInclude: true);
+      relative(include, from: includePackagePath),
+      handleInclude: true,
+    );
 
     rules = await package.getRules(analysisOptionsPath);
     var thisIncludeRules = await package.getIncludeRules(analysisOptionsPath);
@@ -44,8 +48,11 @@ Future<void> tklintFixRules(String path,
     rules.merge(includeRules);
     rules.removeDifferentRules(thisIncludeRules);
   } else {
-    rules = await package.getRules(analysisOptionsPath,
-        handleInclude: true, fromInclude: true);
+    rules = await package.getRules(
+      analysisOptionsPath,
+      handleInclude: true,
+      fromInclude: true,
+    );
   }
   rules.removeObsoleteRules();
 
@@ -69,14 +76,17 @@ Future<void> tklintFixRules(String path,
 class TklintFixRulesCommand extends ShellBinCommand {
   /// Clear
   TklintFixRulesCommand()
-      : super(
-            name: 'fix-rules',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'fix-rules',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
 Fix rules overrides over another file
-      ''') {
-    parser.addOption('include',
-        help: 'Include first the rules from another project file');
+      ''',
+      ) {
+    parser.addOption(
+      'include',
+      help: 'Include first the rules from another project file',
+    );
     parser.addFlag('recursive', help: 'Go recursive in dart projects');
   }
 
@@ -95,9 +105,11 @@ Fix rules overrides over another file
       dirs = await recursivePubPath(dirs);
     }
     for (var dir in dirs) {
-      await tklintFixRules(dir,
-          analysisOptionsPath: analysisOptionsPath,
-          options: TklintFixRulesOptions(include: include, verbose: verbose));
+      await tklintFixRules(
+        dir,
+        analysisOptionsPath: analysisOptionsPath,
+        options: TklintFixRulesOptions(include: include, verbose: verbose),
+      );
     }
     return true;
   }

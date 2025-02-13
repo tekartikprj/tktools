@@ -10,18 +10,18 @@ void main() {
       yamlEditor.updateOrAdd(['other', 'sub'], 3);
       expect(yamlEditor.parseAt([]), {
         'other': {'sub': 3},
-        'test': 1
+        'test': 1,
       });
       yamlEditor.updateOrAdd(['other', 'other_sub'], 4);
       expect(yamlEditor.parseAt([]), {
         'other': {'other_sub': 4, 'sub': 3},
-        'test': 1
+        'test': 1,
       });
       yamlEditor = YamlEditor('test: 1');
       yamlEditor.updateOrAdd(['other', 'sub'], 2);
       expect(yamlEditor.parseAt([]), {
         'other': {'sub': 2},
-        'test': 1
+        'test': 1,
       });
 
       // yamlEditor.update(['YAML'], "YAML Ain't Markup Language");

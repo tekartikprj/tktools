@@ -21,14 +21,20 @@ class DtkConfigDb {
   final bool verbose;
 
   /// Constructor
-  const DtkConfigDb(
-      {required this.database, this.exportPath, bool? write, bool? verbose})
-      : write = write ?? false,
-        verbose = verbose ?? false;
+  const DtkConfigDb({
+    required this.database,
+    this.exportPath,
+    bool? write,
+    bool? verbose,
+  }) : write = write ?? false,
+       verbose = verbose ?? false;
 }
 
-Future<DtkConfigDb> _dtkConfigDbOpen(
-    {required String exportPath, bool? write, bool? verbose}) async {
+Future<DtkConfigDb> _dtkConfigDbOpen({
+  required String exportPath,
+  bool? write,
+  bool? verbose,
+}) async {
   var factory = newDatabaseFactoryMemory();
   verbose ??= false;
   Database? db;
@@ -40,17 +46,21 @@ Future<DtkConfigDb> _dtkConfigDbOpen(
   if (exportFile.existsSync()) {
     try {
       db = await importDatabaseAny(
-          await exportFile.readLines(), factory, dbName);
+        await exportFile.readLines(),
+        factory,
+        dbName,
+      );
     } catch (e) {
       stderr.writeln('error: $e, deleting $exportPath');
     }
   }
   db ??= await factory.openDatabase(dbName);
   return DtkConfigDb(
-      database: db,
-      exportPath: exportPath,
-      write: write ?? false,
-      verbose: verbose);
+    database: db,
+    exportPath: exportPath,
+    write: write ?? false,
+    verbose: verbose,
+  );
 }
 
 Future<void> _dtkGitConfigDbClose(DtkConfigDb db) async {
@@ -65,16 +75,24 @@ Future<void> _dtkGitConfigDbClose(DtkConfigDb db) async {
       stderr.writeln('exporting ${exportFile.path}');
     }
     await exportFile.writeLines(
-        exportLinesToJsonStringList(await exportDatabaseLines(db.database)));
+      exportLinesToJsonStringList(await exportDatabaseLines(db.database)),
+    );
   }
   await db.database.close();
 }
 
 /// tkpub action on db, import & export
-Future<T> dtkConfigDbAction<T>(Future<T> Function(DtkConfigDb configDb) action,
-    {bool? write, required String exportPath, bool? verbose}) async {
+Future<T> dtkConfigDbAction<T>(
+  Future<T> Function(DtkConfigDb configDb) action, {
+  bool? write,
+  required String exportPath,
+  bool? verbose,
+}) async {
   var db = await _dtkConfigDbOpen(
-      exportPath: exportPath, write: write, verbose: verbose);
+    exportPath: exportPath,
+    write: write,
+    verbose: verbose,
+  );
   try {
     return await action(db);
   } finally {

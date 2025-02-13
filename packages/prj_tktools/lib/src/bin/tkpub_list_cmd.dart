@@ -14,12 +14,13 @@ import 'tkpub_add_cmd.dart';
 class TkPubListCommand extends TkPubSubCommand {
   /// Clear
   TkPubListCommand()
-      : super(
-            name: 'list',
-            parser: ArgParser(allowTrailingOptions: true),
-            description: '''
+    : super(
+        name: 'list',
+        parser: ArgParser(allowTrailingOptions: true),
+        description: '''
       List package dependencies
-      ''') {
+      ''',
+      ) {
     parser.addFlag(flagDevKey, help: 'list dev dependencies');
     parser.addFlag(flagOverridesKey, help: 'list dependency overrides');
   }
@@ -34,7 +35,8 @@ class TkPubListCommand extends TkPubSubCommand {
       kind = PubDependencyKind.dev;
       if (overrides) {
         throw ArgumentError(
-            'Cannot use --$flagDevKey with --$flagOverridesKey');
+          'Cannot use --$flagDevKey with --$flagOverridesKey',
+        );
       }
     } else if (overrides) {
       kind = PubDependencyKind.override;
@@ -49,8 +51,10 @@ class TkPubListCommand extends TkPubSubCommand {
 
     var pubspec = await pathGetPubspecYamlMap(path);
 
-    var dependencies =
-        pubspecYamlGetDependenciesPackageName(pubspec, kind: kind);
+    var dependencies = pubspecYamlGetDependenciesPackageName(
+      pubspec,
+      kind: kind,
+    );
     packages =
         packages.where((element) => dependencies.contains(element)).toList();
     packages.sort();
