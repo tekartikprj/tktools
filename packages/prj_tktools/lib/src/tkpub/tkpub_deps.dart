@@ -1,5 +1,7 @@
+import 'package:collection/collection.dart';
 import 'package:cv/cv.dart';
 import 'package:dev_build/menu/menu_run_ci.dart';
+import 'package:dev_build/package.dart';
 import 'package:dev_build/shell.dart';
 import 'package:fs_shim/utils/io/read_write.dart' show linesToIoString;
 import 'package:fs_shim/utils/path.dart' show toPosixPath;
@@ -158,6 +160,7 @@ class TkPubDepsManager {
             var subPath = relative(path, from: topPath);
             stdout.writeln('# $subPath');
             var pubspecMap = await pathGetPubspecYamlMap(subPath);
+            var dartPackage = DartPackageReader.pubspecYaml(pubspecMap);
             var localPackageName = pubspecYamlGetPackageName(pubspecMap)!;
             if (packageName == localPackageName) {
               if (options.verbose) {
@@ -175,6 +178,13 @@ class TkPubDepsManager {
             var overrides =
                 info.target == TkPubTarget.override ||
                 (info.target == null && options.overridesDependencies);
+
+            var kind =
+                dev
+                    ? PubDependencyKind.dev
+                    : (overrides
+                        ? PubDependencyKind.override
+                        : PubDependencyKind.direct);
 
             var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');
             if (isRemove) {
@@ -195,16 +205,44 @@ class TkPubDepsManager {
                   ),
                 );
               } else {
-                toAdd.add(
-                  subPath,
-                  shellArgument(
-                    '$prefix'
-                    '$packageName:'
-                    '${jsonEncode({
-                      if (package.gitUrl.isNotNull) 'git': {'url': package.gitUrl.v, if (package.gitPath.isNotNull) 'path': package.gitPath.v, if (package.gitRef.isNotNull) 'ref': package.gitRef.v},
-                    })}',
-                  ),
+                var existingDependencyMap = dartPackage.getDependencyObject(
+                  dependency: packageName,
+                  kind: kind,
                 );
+                var newDependencyMap = {
+                  packageName: {
+                    if (package.gitUrl.isNotNull)
+                      'git': {
+                        'url': package.gitUrl.v,
+                        if (package.gitPath.isNotNull)
+                          'path': package.gitPath.v,
+                        if (package.gitRef.isNotNull) 'ref': package.gitRef.v,
+                      },
+                  },
+                };
+                if (const DeepCollectionEquality().equals(
+                  existingDependencyMap,
+                  newDependencyMap,
+                )) {
+                  stdout.writeln(
+                    'Dependency $kind $packageName already configured',
+                  );
+                } else {
+                  toAdd.add(
+                    subPath,
+                    shellArgument(
+                      '$prefix'
+                      '$packageName:'
+                      '${jsonEncode({
+                        if (package.gitUrl.isNotNull) 'git': {'url': package.gitUrl.v, if (package.gitPath.isNotNull) 'path': package.gitPath.v, if (package.gitRef.isNotNull) 'ref': package.gitRef.v},
+                      })}',
+                    ),
+                  );
+                }
+                /*print(jsonPretty(existingDependencyMap));
+                print('vs');
+                print(jsonPretty(newDependencyMap));
+                exit(1);*/
               }
             }
           }
