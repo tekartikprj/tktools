@@ -195,10 +195,8 @@ class DtkProject {
     var dofPub = prj.dofPub;
     var localPubspecMap = prj.pubspecYaml;
     var overrides = localPubspecMap['dependency_overrides'];
-    print(overrides);
     if (overrides is Map) {
       var keys = overrides.keys.map((e) => e.toString());
-      print(keys);
       var shell = Shell(workingDirectory: path, verbose: true);
       stdout.writeln('Removing overrides: ${keys.join(', ')}');
       await shell.run(
