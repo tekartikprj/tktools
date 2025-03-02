@@ -220,6 +220,11 @@ class TkPubDepsManager {
                       },
                   },
                 };
+                /*
+                print(jsonPretty(existingDependencyMap));
+                print('vs');
+                print(jsonPretty(newDependencyMap));
+                */
                 if (const DeepCollectionEquality().equals(
                   existingDependencyMap,
                   newDependencyMap,
@@ -239,10 +244,6 @@ class TkPubDepsManager {
                     ),
                   );
                 }
-                /*print(jsonPretty(existingDependencyMap));
-                print('vs');
-                print(jsonPretty(newDependencyMap));
-                exit(1);*/
               }
             }
           }

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:cv/cv.dart';
+import 'package:dev_build/menu/menu_run_ci.dart';
+import 'package:dev_build/shell.dart';
 import 'package:fs_shim/utils/path.dart' show toPosixPath;
 import 'package:path/path.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
@@ -177,6 +179,44 @@ class DtkProject {
         }
         var dtkProject = DtkProject(path);
         await dtkProject.addToWorkspace();
+      },
+    );
+  }
+
+  /// Add all projects (inner directories) to workspace
+  Future<void> clearDependencyOverrides() async {
+    var depOverridePath = join(path, 'pubspec_overrides.yaml');
+    if (File(depOverridePath).existsSync()) {
+      stdout.writeln('Deleting $depOverridePath');
+      await File(depOverridePath).delete();
+    }
+    var prj = PubIoPackage(path);
+    await prj.ready;
+    var dofPub = prj.dofPub;
+    var localPubspecMap = prj.pubspecYaml;
+    var overrides = localPubspecMap['dependency_overrides'];
+    if (overrides is Map) {
+      var keys = overrides.keys.map((e) => toString());
+      var shell = Shell(workingDirectory: path, verbose: true);
+      stdout.writeln('Removing overrides: ${keys.join(', ')}');
+      await shell.run(
+        '$dofPub remove ${keys.map((key) => 'override:$key').join(' ')}',
+      );
+    }
+  }
+
+  /// Add all projects (inner directories) to workspace
+  Future<void> clearSubProjectsDependencyOverrides() async {
+    /// Safe compare
+    var normalizedPath = normalize(absolute(path));
+    await recursiveActions(
+      [path],
+      action: (path) async {
+        if (normalize(absolute(path)) == normalizedPath) {
+          return;
+        }
+        var dtkProject = DtkProject(path);
+        await dtkProject.clearDependencyOverrides();
       },
     );
   }
