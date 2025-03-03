@@ -1,5 +1,6 @@
 import 'package:cv/cv.dart';
 import 'package:dev_build/build_support.dart';
+import 'package:dev_build/menu/menu_run_ci.dart';
 import 'package:process_run/shell.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
@@ -36,7 +37,9 @@ Future<Model> tkPubGetPackageConfigMap(String pkgPath) async {
     packageConfigMap = await pathGetPackageConfigMap(pkgPath);
   } catch (_) {
     try {
-      await Shell(workingDirectory: pkgPath).run('dart pub get');
+      var ioPackage = PubIoPackage(pkgPath);
+      var dofPub = ioPackage.dofPub;
+      await Shell(workingDirectory: pkgPath).run('$dofPub get');
 
       packageConfigMap = await pathGetPubspecYamlMap(pkgPath);
     } catch (e) {

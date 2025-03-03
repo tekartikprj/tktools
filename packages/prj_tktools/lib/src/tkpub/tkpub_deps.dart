@@ -159,7 +159,10 @@ class TkPubDepsManager {
           Future<void> handlePath(String path) async {
             var subPath = relative(path, from: topPath);
             stdout.writeln('# $subPath');
-            var pubspecMap = await pathGetPubspecYamlMap(subPath);
+            var ioPackage = PubIoPackage(subPath);
+            await ioPackage.ready;
+            var pubspecMap = ioPackage.pubspecYaml;
+            var dofPub = ioPackage.dofPub;
             var dartPackage = DartPackageReader.pubspecYaml(pubspecMap);
             var localPackageName = pubspecYamlGetPackageName(pubspecMap)!;
             if (packageName == localPackageName) {
@@ -168,9 +171,6 @@ class TkPubDepsManager {
               }
               return;
             }
-            var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
-            var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
-
             var shell = Shell(workingDirectory: subPath);
             var dev =
                 info.target == TkPubTarget.dev ||
@@ -189,7 +189,7 @@ class TkPubDepsManager {
             var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');
             if (isRemove) {
               await shell.run(
-                '$dartOrFlutter pub remove $prefix'
+                '$dofPub remove $prefix'
                 '$packageName',
               );
             } else {
@@ -305,6 +305,7 @@ class TkPubDepsManager {
             stdout.writeln('# ${relative(path, from: topPath)}');
             var prj = PubIoPackage(path);
             await prj.ready;
+            var dofPub = prj.dofPub;
             var localPubspecMap = prj.pubspecYaml;
             var localPackageName = pubspecYamlGetPackageName(localPubspecMap)!;
 
@@ -314,9 +315,6 @@ class TkPubDepsManager {
               }
               return;
             }
-            var isFlutterPackage = prj.isFlutter;
-            var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
-
             var hasDependency =
                 allPackageWithDependency.contains(localPackageName) ||
                 bothDepsAndPubspecOverrides;
@@ -422,7 +420,7 @@ class TkPubDepsManager {
 
             if (shouldPubGet) {
               var shell = Shell().cd(path);
-              await shell.run('$dartOrFlutter pub get');
+              await shell.run('$dofPub get');
             }
           }
 
@@ -435,12 +433,12 @@ class TkPubDepsManager {
     });
     for (var packagesToAdd in toAdd.group()) {
       var path = packagesToAdd.path;
-      var pubspecMap = await pathGetPubspecYamlMap(path);
-      var isFlutterPackage = pubspecYamlSupportsFlutter(pubspecMap);
-      var dartOrFlutter = isFlutterPackage ? 'flutter' : 'dart';
+      var ioPackage = PubIoPackage(path);
+      await ioPackage.ready;
+      var dofPub = ioPackage.dofPub;
       var shell = Shell(workingDirectory: path);
       await shell.run(
-        '$dartOrFlutter pub add ${packagesToAdd.dartPubAddArgs.join(' ')} --directory .',
+        '$dofPub add ${packagesToAdd.dartPubAddArgs.join(' ')} --directory .',
       );
     }
   }
