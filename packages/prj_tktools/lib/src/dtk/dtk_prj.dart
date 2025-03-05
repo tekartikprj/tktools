@@ -91,7 +91,7 @@ class DtkProject {
   }
 
   /// Add current project to workspace
-  Future<void> addToWorkspace() async {
+  Future<void> addToWorkspace({bool? keepExistingWorkspaceResolution}) async {
     await _lock.synchronized(() async {
       await _addToWorkspace();
     });
@@ -168,7 +168,11 @@ class DtkProject {
   }
 
   /// Add all projects (inner directories) to workspace
-  Future<void> addAllProjectsToWorkspace() async {
+  /// if [keepExistingWorkspaceResolution] is true, only add existing projects with already a
+  /// workspace resolution
+  Future<void> addAllProjectsToWorkspace({
+    bool? keepExistingWorkspaceResolution,
+  }) async {
     /// Safe compare
     var normalizedPath = normalize(absolute(path));
     await recursiveActions(
@@ -178,6 +182,16 @@ class DtkProject {
           return;
         }
         var dtkProject = DtkProject(path);
+        if (keepExistingWorkspaceResolution ?? false) {
+          var pubIoPackage = PubIoPackage(path);
+          await pubIoPackage.ready;
+          if (!pubIoPackage.hasWorkspaceResolution) {
+            stdout.writeln(
+              'Skipping project without workspace resolution: $path',
+            );
+            return;
+          }
+        }
         await dtkProject.addToWorkspace();
       },
     );

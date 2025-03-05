@@ -64,6 +64,15 @@ void _dtkPrjMenu({required String path}) {
           await prj.addAllProjectsToWorkspace();
         },
       );
+      item(
+        'create workspace root project and add existing project to root',
+        () async {
+          await prj.createWorkspaceRootProject();
+          await prj.addAllProjectsToWorkspace(
+            keepExistingWorkspaceResolution: true,
+          );
+        },
+      );
       item('clear non-workspace overrides', () async {
         await prj.clearSubProjectsDependencyOverrides();
       });
