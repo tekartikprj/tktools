@@ -38,13 +38,15 @@ Future<Model> tkPubGetPackageConfigMap(String pkgPath) async {
   } catch (_) {
     try {
       var ioPackage = PubIoPackage(pkgPath);
+      await ioPackage.ready;
       var dofPub = ioPackage.dofPub;
       await Shell(workingDirectory: pkgPath).run('$dofPub get');
 
       packageConfigMap = await pathGetPubspecYamlMap(pkgPath);
     } catch (e) {
       stderr.writeln('Error: $e failed to get package-config.yaml');
+      rethrow;
     }
   }
-  return packageConfigMap!;
+  return packageConfigMap;
 }
