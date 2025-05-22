@@ -97,16 +97,49 @@ class DtkProject {
     });
   }
 
+  /// Remove current project from workspace
+  Future<void> removeFromWorkspace() async {
+    await _lock.synchronized(() async {
+      await _setWorkspaceResolution(false);
+      var parent = await _findParentRootWorkspaceOrNull();
+      if (parent == null) {
+        return;
+      }
+      var relativePath = toPosixPath(relative(path, from: parent));
+      var pubspecMap = await pathGetPubspecYamlMap(parent);
+      var workspace = pubspecMap['workspace'];
+      if (workspace is List) {
+        if (!workspace.contains(relativePath)) {
+          return;
+        }
+        var newList = List<String>.from(workspace)..remove(relativePath);
+        var file = File(join(parent, 'pubspec.yaml'));
+        var yamlEditor = YamlEditor(await file.readAsString());
+        stdout.writeln('Setting $newList to workspace');
+        yamlEditor.updateOrAdd(['workspace'], newList);
+        await file.writeLinesIfNeeded(yamlEditor.toLines(), verbose: true);
+      }
+    });
+  }
+
   /// Make static for cross project lock
   static final _lock = Lock();
 
   /// Add current project to workspace
   Future<void> _addToWorkspace() async {
-    await _setWorkspaceResolution();
+    await _setWorkspaceResolution(true);
     await _addToRootWorkspace();
   }
 
   Future<String> _findParentRootWorkspace() async {
+    var parent = await _findParentRootWorkspaceOrNull();
+    if (parent == null) {
+      throw StateError('Parent workspace not found for $path');
+    }
+    return parent;
+  }
+
+  Future<String?> _findParentRootWorkspaceOrNull() async {
     var parent = dirname(normalize(absolute(path)));
     while (true) {
       try {
@@ -117,7 +150,7 @@ class DtkProject {
       } catch (_) {}
       var newParent = dirname(parent);
       if (newParent == parent) {
-        throw StateError('Parent workspace not found for $path');
+        return null;
       }
       parent = newParent;
     }
@@ -147,7 +180,7 @@ class DtkProject {
   }
 
   /// Set "resolution: workspace" in pubspec.yaml
-  Future<void> _setWorkspaceResolution() async {
+  Future<void> _setWorkspaceResolution(bool on) async {
     var file = File(join(path, 'pubspec.yaml'));
     if (!file.existsSync()) {
       stderr.writeln('$file not found');
@@ -155,14 +188,22 @@ class DtkProject {
       var pubspecMap = await pathGetPubspecYamlMap(path);
       var resolution = (pubspecMap['resolution']);
       if (resolution == 'workspace') {
-        stderr.writeln('$file already in workspace');
-        return;
-      } else if (resolution != null) {
-        stderr.writeln('$file already has resolution: $resolution');
-        return;
+        if (on) {
+          stderr.writeln('$file already in workspace');
+          return;
+        }
+      } else {
+        if (!on) {
+          stderr.writeln('$file already not in workspace');
+          return;
+        }
       }
       var yamlEditor = YamlEditor(await file.readAsString());
-      yamlEditor.updateOrAdd(['resolution'], 'workspace');
+      if (on) {
+        yamlEditor.updateOrAdd(['resolution'], 'workspace');
+      } else {
+        yamlEditor.remove(['resolution']);
+      }
       await file.writeLinesIfNeeded(yamlEditor.toLines(), verbose: true);
     }
   }
