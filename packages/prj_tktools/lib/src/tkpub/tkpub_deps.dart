@@ -1,5 +1,4 @@
 import 'package:collection/collection.dart';
-import 'package:cv/cv.dart';
 import 'package:dev_build/menu/menu_run_ci.dart';
 import 'package:dev_build/package.dart';
 import 'package:dev_build/shell.dart';
