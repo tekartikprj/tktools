@@ -1,3 +1,5 @@
+export 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
+
 export 'src/bin/tkpub.dart' show tkPubMain;
 export 'src/tkpub.dart'
     show

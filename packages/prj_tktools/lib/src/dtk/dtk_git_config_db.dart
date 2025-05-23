@@ -1,6 +1,7 @@
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/tags.dart';
 import 'package:tekartik_prj_tktools/dtk.dart';
+export 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
 /// Db config ref
 class DbDtkGitConfigRef extends DbStringRecordBase {

@@ -4,7 +4,6 @@ import 'package:path/path.dart';
 // ignore: depend_on_referenced_packages
 import 'package:pool/pool.dart';
 import 'package:process_run/stdio.dart';
-import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_common_utils/string_utils.dart';
 import 'package:tekartik_common_utils/tags.dart';
