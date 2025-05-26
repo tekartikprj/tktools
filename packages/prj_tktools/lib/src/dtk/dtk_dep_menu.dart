@@ -1,5 +1,4 @@
 import 'package:dev_build/menu/menu_io.dart';
-import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_dep_config_db.dart';
