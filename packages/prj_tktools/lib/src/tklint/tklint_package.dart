@@ -30,8 +30,11 @@ class TkLintPackage {
       var parts = packagePath.splitFirst('/');
       var packageName = parts.first;
       var packagePathRest = parts.last;
-      var ioPackagePath =
-          pathPackageConfigMapGetPackagePath(path, configMap, packageName)!;
+      var ioPackagePath = pathPackageConfigMapGetPackagePath(
+        path,
+        configMap,
+        packageName,
+      )!;
       return join(ioPackagePath, 'lib', packagePathRest);
     }
     return pathDef;

@@ -41,7 +41,8 @@ publish_to: none
 environment:
   sdk: ^3.6.0
 workspace:
-'''.lines;
+'''
+        .lines;
 final _projectPubspec =
     '''
 name: {{projectName}}
@@ -49,7 +50,8 @@ publish_to: none
 environment:
   sdk: ^3.6.0
 resolution: workspace
-'''.lines;
+'''
+        .lines;
 
 /// Get the pubspec.yaml lines for an empty project
 Future<List<String>> getEmptyProjectPubspecLines({

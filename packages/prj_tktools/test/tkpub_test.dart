@@ -27,8 +27,8 @@ void main() {
         database: await newDatabaseFactoryMemory().openDatabase('test'),
       );
       db.initBuilders();
-      var package =
-          tkPubPackagesStore.record('pkg1').cv()..gitUrl.v = 'gitUri1';
+      var package = tkPubPackagesStore.record('pkg1').cv()
+        ..gitUrl.v = 'gitUri1';
       var config = tkPubConfigRefRecord.cv()..gitRef.v = 'gitRef1';
 
       await config.put(db.db);

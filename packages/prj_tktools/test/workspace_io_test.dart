@@ -24,7 +24,8 @@ environment:
   sdk: ^3.6.0
 workspace:
   - packages/project
-'''.lines;
+'''
+            .lines;
     var projectPubspec =
         '''
 name: tekartik_test_project1
@@ -32,7 +33,8 @@ publish_to: none
 environment:
   sdk: ^3.6.0
 resolution: workspace
-'''.lines;
+'''
+            .lines;
     var topDir = join(
       '.dart_tool',
       'tekartik_prj_tktools',

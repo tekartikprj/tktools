@@ -177,12 +177,11 @@ class TkPubDepsManager {
                 info.target == TkPubTarget.override ||
                 (info.target == null && options.overridesDependencies);
 
-            var kind =
-                dev
-                    ? PubDependencyKind.dev
-                    : (overrides
-                        ? PubDependencyKind.override
-                        : PubDependencyKind.direct);
+            var kind = dev
+                ? PubDependencyKind.dev
+                : (overrides
+                      ? PubDependencyKind.override
+                      : PubDependencyKind.direct);
 
             var prefix = dev ? 'dev:' : (overrides ? 'overrides:' : '');
             if (isRemove) {
@@ -283,8 +282,8 @@ class TkPubDepsManager {
                   var subPubspec = await pathGetPubspecYamlMap(path);
                   var packageName = pubspecYamlGetPackageName(subPubspec)!;
                   newAll.add(packageName);
-                  dependencies =
-                      (dependencies.toSet()..add(packageName)).toList();
+                  dependencies = (dependencies.toSet()..add(packageName))
+                      .toList();
                 }
                 if (newAll.length == allPackageWithDependency.length) {
                   break;
@@ -322,10 +321,9 @@ class TkPubDepsManager {
               }
               return;
             }
-            var inlineOverrides =
-                localPubspecMap['dependency_overrides']
-                    ?.anyAs<Map?>()
-                    ?.deepClone();
+            var inlineOverrides = localPubspecMap['dependency_overrides']
+                ?.anyAs<Map?>()
+                ?.deepClone();
             // devPrint('inlineOverrides: $inlineOverrides');
             var workPath = await pathGetResolvedWorkPath(path);
             var pubspecOverrideFile = File(
@@ -335,15 +333,15 @@ class TkPubDepsManager {
             var pubspecOverridesMap = Model();
             try {
               var existingText = await pubspecOverrideFile.readAsString();
-              pubspecOverridesMap =
-                  (loadYaml(existingText) as Object).anyAs<Map>().deepClone();
+              pubspecOverridesMap = (loadYaml(existingText) as Object)
+                  .anyAs<Map>()
+                  .deepClone();
             } catch (_) {}
 
             var githubTop = normalize(absolute(findGithubTop(path)));
-            var existing =
-                pubspecOverridesMap['dependency_overrides']
-                    ?.anyAs<Map?>()
-                    ?.deepClone();
+            var existing = pubspecOverridesMap['dependency_overrides']
+                ?.anyAs<Map?>()
+                ?.deepClone();
 
             var overrides = newModel();
             // Add inline (in pubspec.yaml) first.

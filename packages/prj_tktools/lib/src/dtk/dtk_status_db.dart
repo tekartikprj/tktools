@@ -247,13 +247,12 @@ class DtkStatusDb {
     required bool main,
     T? model,
   }) async {
-    var newAction =
-        cvNewModel<T>()
-          ..action.v = action
-          ..timepoint.v = timepointId
-          ..timestamp.v = Timestamp.now()
-          ..status.v = actionResultNone
-          ..main.v = main;
+    var newAction = cvNewModel<T>()
+      ..action.v = action
+      ..timepoint.v = timepointId
+      ..timestamp.v = Timestamp.now()
+      ..status.v = actionResultNone
+      ..main.v = main;
     if (model != null) {
       /// Copy fields
       for (var field in model.fields) {
@@ -293,13 +292,12 @@ class DtkStatusDb {
       if (model != null) {
         filter = _filterFromModel(model);
       }
-      var foundAction =
-          (await _findActions<T>(
-            txn,
-            timepointId,
-            action,
-            filter: filter,
-          )).firstOrNull;
+      var foundAction = (await _findActions<T>(
+        txn,
+        timepointId,
+        action,
+        filter: filter,
+      )).firstOrNull;
 
       return foundAction ??
           _createAction<T>(
@@ -411,11 +409,10 @@ class DtkStatusDb {
     List<String>? dependencies,
   }) async {
     now ??= Timestamp.now();
-    var record =
-        DbDtkTimepoint()
-          ..timestamp.v = now
-          ..tagFilter.setValue(tagFilter)
-          ..dependencies.setValue(dependencies);
+    var record = DbDtkTimepoint()
+      ..timestamp.v = now
+      ..tagFilter.setValue(tagFilter)
+      ..dependencies.setValue(dependencies);
     var timepoint = await dbDtkTimepointStore.add(txn, record);
     await _setCurrentTimepointId(txn, timepoint.id);
     return timepoint;
@@ -438,12 +435,9 @@ class DtkStatusDb {
   }) async {
     return await db.transaction((txn) async {
       /// Find the before timestamp
-      beforeTimestamp ??=
-          beforeId != null
-              ? (await dbDtkTimepointStore
-                  .record(beforeId)
-                  .get(txn))?.timestamp.v
-              : null;
+      beforeTimestamp ??= beforeId != null
+          ? (await dbDtkTimepointStore.record(beforeId).get(txn))?.timestamp.v
+          : null;
       if (beforeTimestamp == null) {
         return 0;
       }

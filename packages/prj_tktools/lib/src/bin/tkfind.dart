@@ -123,18 +123,15 @@ class Finder {
     var fileOnly = options.fileOnly;
     var showHidden = options.showHidden;
     // ignore: unused_local_variable
-    var globs =
-        options.globs
-            .map((e) => e.removeDiacritics().toLowerCase().trim())
-            .toList();
-    var texts =
-        options.texts
-            .map((e) => e.removeDiacritics().toLowerCase().trim())
-            .toList();
-    var exts =
-        options.exts
-            .map((e) => e.removeDiacritics().toLowerCase().trim())
-            .toList();
+    var globs = options.globs
+        .map((e) => e.removeDiacritics().toLowerCase().trim())
+        .toList();
+    var texts = options.texts
+        .map((e) => e.removeDiacritics().toLowerCase().trim())
+        .toList();
+    var exts = options.exts
+        .map((e) => e.removeDiacritics().toLowerCase().trim())
+        .toList();
 
     bool matches(FileSystemEntity entity) {
       var entityPath = entity.path;

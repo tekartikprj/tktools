@@ -9,8 +9,8 @@ Future<void> main() async {
         database: await newDatabaseFactoryMemory().openDatabase('test'),
       );
       db.initBuilders();
-      var package =
-          dtkGitDbRepositoryStore.record('repo1').cv()..gitUrl.v = 'gitUri1';
+      var package = dtkGitDbRepositoryStore.record('repo1').cv()
+        ..gitUrl.v = 'gitUri1';
       await db.setRepository(package);
       package = await db.getRepository('repo1');
       expect(package.gitUrl.v, 'gitUri1');

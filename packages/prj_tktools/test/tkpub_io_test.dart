@@ -42,10 +42,9 @@ void main() {
       await Directory(projectPath).delete(recursive: true);
     }
     await Directory(projectPath).create(recursive: true);
-    var shellEnvironment =
-        ShellEnvironment()
-          ..aliases['tkpub'] =
-              'dart run ${shellArgument(tkPubPath)} --config-export-path ${shellArgument(configExportPath)}';
+    var shellEnvironment = ShellEnvironment()
+      ..aliases['tkpub'] =
+          'dart run ${shellArgument(tkPubPath)} --config-export-path ${shellArgument(configExportPath)}';
     shell = Shell(environment: shellEnvironment);
   });
   test('tkpub config get-export-path', () async {

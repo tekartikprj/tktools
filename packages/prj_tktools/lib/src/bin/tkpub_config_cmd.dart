@@ -77,11 +77,10 @@ class _SetCommand extends _TkPubConfigSubCommand {
 
     var packageName = rest.first;
     await tkPubConfigCommand.dbAction((db) async {
-      var package =
-          tkPubPackagesStore.record(packageName).cv()
-            ..gitUrl.v = gitUrl
-            ..gitPath.setValue(gitPath)
-            ..gitRef.setValue(gitRef);
+      var package = tkPubPackagesStore.record(packageName).cv()
+        ..gitUrl.v = gitUrl
+        ..gitPath.setValue(gitPath)
+        ..gitRef.setValue(gitRef);
       await db.setPackage(package.id, package);
       writePackageConfig(package);
     }, write: true);

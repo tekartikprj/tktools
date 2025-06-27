@@ -163,12 +163,11 @@ class DtkFindDartProjectActionRunner
         continue;
       }
       var gitProjectTop = join(gitTop, repo);
-      var paths =
-          (await recursivePubPath(
-            [gitProjectTop],
-            dependencies: timepoint?.dependencies.v,
-            readConfig: true,
-          )).map((path) => relative(path, from: gitProjectTop)).toList();
+      var paths = (await recursivePubPath(
+        [gitProjectTop],
+        dependencies: timepoint?.dependencies.v,
+        readConfig: true,
+      )).map((path) => relative(path, from: gitProjectTop)).toList();
       stdout.writeln('repo $repo: $paths');
 
       findDartProjectAction.dartProjects.v = paths;
@@ -311,8 +310,9 @@ void dtkGitMenu() {
         }
 
         config ??= DbDtkStatusConfig();
-        config.defaultTagFilter.v =
-            TagsCondition(tagFilter).toText().nonEmpty();
+        config.defaultTagFilter.v = TagsCondition(
+          tagFilter,
+        ).toText().nonEmpty();
         config = await db.setConfig(config);
         write(config);
       });
@@ -480,8 +480,8 @@ void dtkGitMenu() {
                 return;
               }
             }
-            repo ??=
-                DbDtkGitRepository()..ref = dtkGitDbRepositoryStore.record(id);
+            repo ??= DbDtkGitRepository()
+              ..ref = dtkGitDbRepositoryStore.record(id);
 
             var tags = await prompt('tags');
             if (tags.nonEmpty() != null) {

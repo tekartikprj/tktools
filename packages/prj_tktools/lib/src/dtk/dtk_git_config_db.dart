@@ -178,10 +178,9 @@ Future<List<DbDtkGitRepository>> dtkGitGetAllRepositories({
     var allRepos = await dtkGitDbRepositoryStore.query().getRecords(db.db);
     if (tagFilter != null) {
       var tagsCondition = TagsCondition(tagFilter);
-      allRepos =
-          allRepos
-              .where((repo) => tagsCondition.check(Tags.fromList(repo.tags.v)))
-              .toList();
+      allRepos = allRepos
+          .where((repo) => tagsCondition.check(Tags.fromList(repo.tags.v)))
+          .toList();
     }
     return allRepos;
   });
