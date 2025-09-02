@@ -1,4 +1,6 @@
 import 'package:args/args.dart';
+import 'package:dev_build/shell.dart';
+import 'package:path/path.dart';
 // ignore: implementation_imports
 import 'package:process_run/src/mixin/shell_bin.dart';
 import 'package:process_run/stdio.dart';
@@ -6,6 +8,7 @@ import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
+import 'package:tekartik_prj_tktools/src/utils.dart';
 
 /// git url option
 const optionGitUrl = 'git-url';
@@ -27,6 +30,7 @@ class TkPubConfigCommand extends TkPubSubCommand {
     addCommand(_GetRefCommand());
     addCommand(_ListCommand());
     addCommand(_GetExportPathCommand());
+    addCommand(_GetLocalPathCommand());
   }
 }
 
@@ -105,6 +109,40 @@ class _GetCommand extends _TkPubConfigSubCommand {
       stdout.writeln(
         '${package.id} ${package.gitUrl.v}${package.gitPath.isNotNull ? ' ${package.gitPath.v}' : ''}${package.gitRef.isNotNull ? ' ${package.gitRef.v}' : ''}',
       );
+    });
+    return true;
+  }
+}
+
+class _GetLocalPathCommand extends _TkPubConfigSubCommand {
+  _GetLocalPathCommand()
+    : super(
+        name: 'get-local-path',
+        parser: ArgParser(allowTrailingOptions: true),
+      );
+
+  @override
+  FutureOr<bool> onRun() async {
+    var rest = results.rest;
+    if (rest.length != 1) {
+      throw ArgumentError('One argument expected (package name)');
+    }
+    var packageName = rest.first;
+
+    await tkPubConfigCommand.dbAction((db) async {
+      var dbPackage = await db.getPackage(packageName);
+      var githubTop = ShellEnvironment().vars['TKDEVX_TOP'];
+      if (githubTop != null) {
+        githubTop = join(githubTop, 'git', 'github.com');
+      } else {
+        throw StateError('Missing env var TKDEVX_TOP');
+      }
+      var localPath = getDependencyLocalPath(
+        githubTop: githubTop,
+        gitUrl: dbPackage.gitUrl.v!,
+        gitPath: dbPackage.gitPath.v,
+      );
+      stdout.writeln(localPath);
     });
     return true;
   }
