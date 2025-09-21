@@ -20,52 +20,42 @@ dependencies:
   tekartik_app_common_prefs:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      ref: dart3a
       path: app_prefs
   tekartik_app_cv_sembast:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      ref: dart3a
       path: app_cv_sembast
   tekartik_app_sembast:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      ref: dart3a
       path: app_sembast
   tekartik_common_utils:
     git:
       url: https://github.com/tekartik/common_utils.dart
-      ref: dart3a
   tekartik_pub:
     git:
       url: https://github.com/tekartik/pub.dart
-      ref: dart3a
   tekartik_sc:
     git:
       url: https://github.com/tekartik/sc.dart
-      ref: dart3a
   yaml: '>=3.1.2'
   yaml_edit: ">=2.2.1"
   tekartik_prefs:
     git:
       url: https://github.com/tekartik/prefs.dart
-      ref: dart3a
       path: prefs
   sqflite_common_ffi: ">=2.3.4"
   tekartik_app_crypto:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      ref: dart3a
       path: app_crypto
   tekartik_mustache:
     git:
       url: https://github.com/tekartik/mustache.dart
-      ref: dart3a
       path: mustache
   tekartik_app_text:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      ref: dart3a
       path: app_text
 
 dev_dependencies:
