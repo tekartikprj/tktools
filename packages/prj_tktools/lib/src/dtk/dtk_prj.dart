@@ -12,6 +12,9 @@ import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/yaml_edit.dart';
 
+/// Dart SDK constraint to use if none is specified
+var defaultDartSdkConstraint = '^3.9.0';
+
 extension on String {
   /// Get lines
   List<String> get lines => LineSplitter.split(this).toList();
@@ -39,7 +42,7 @@ final _workspacePubspec =
 name: _
 publish_to: none
 environment:
-  sdk: ^3.6.0
+  sdk: $defaultDartSdkConstraint
 workspace:
 '''
         .lines;
@@ -48,7 +51,7 @@ final _projectPubspec =
 name: {{projectName}}
 publish_to: none
 environment:
-  sdk: ^3.6.0
+  sdk: $defaultDartSdkConstraint
 resolution: workspace
 '''
         .lines;
