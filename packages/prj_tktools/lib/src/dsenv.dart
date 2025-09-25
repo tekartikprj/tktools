@@ -28,7 +28,12 @@ String _passwordVarName(String name) {
 
 /// Get an environment variable, either regular or encrypted, throw if not found
 Future<String> dsUserEnvGetVar(String name) async {
-  var value = await dsUserEnvGetVarOrNull(name);
+  return dsUserEnvGetVarSync(name);
+}
+
+/// Get an environment variable, either regular or encrypted, throw if not found
+String dsUserEnvGetVarSync(String name) {
+  var value = dsUserEnvGetVarOrNullSync(name);
   if (value == null) {
     throw StateError('Environment var $name not defined');
   }
@@ -37,9 +42,14 @@ Future<String> dsUserEnvGetVar(String name) async {
 
 /// Get an environment variable, either regular or encrypted
 Future<String?> dsUserEnvGetVarOrNull(String name) async {
+  return dsUserEnvGetVarOrNullSync(name);
+}
+
+/// Get an environment variable, either regular or encrypted
+String? dsUserEnvGetVarOrNullSync(String name) {
   var value = ShellEnvironment().vars[name];
   if (value == null) {
-    return await dsUserEnvGetEncryptedVarOrNull(name);
+    return dsUserEnvGetEncryptedVarOrNullSync(name);
   } else {
     return value;
   }
@@ -47,7 +57,12 @@ Future<String?> dsUserEnvGetVarOrNull(String name) async {
 
 /// Get an encrypted environment variable, throw if not found
 Future<String> dsUserEnvGetEncryptedVar(String name) async {
-  var value = (await dsUserEnvGetEncryptedVarOrNull(name));
+  return dsUserEnvGetEncryptedVarSync(name);
+}
+
+/// Get an encrypted environment variable, throw if not found
+String dsUserEnvGetEncryptedVarSync(String name) {
+  var value = dsUserEnvGetEncryptedVarOrNullSync(name);
   if (value == null) {
     throw StateError('Encrypted environment var $name not defined');
   }
@@ -56,6 +71,11 @@ Future<String> dsUserEnvGetEncryptedVar(String name) async {
 
 /// Get an encrypted environment variable
 Future<String?> dsUserEnvGetEncryptedVarOrNull(String name) async {
+  return dsUserEnvGetEncryptedVarOrNullSync(name);
+}
+
+/// Get an encrypted environment variable
+String? dsUserEnvGetEncryptedVarOrNullSync(String name) {
   var encryptedVarName = _encryptedVarName(name);
   var passwordVarName = _passwordVarName(name);
   var encrypted = ShellEnvironment().vars[encryptedVarName];
