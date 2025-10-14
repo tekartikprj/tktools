@@ -39,7 +39,7 @@ void dtkDepMenu() {
     menu('dependency', () {
       item('list', () async {
         await dtkDepConfigDbAction((db) async {
-          var dependencies = await db.getAllDependencies();
+          var dependencies = List.of(await db.getAllDependencies());
           dependencies.sort((a, b) => a.id.compareTo(b.id));
           for (var dependency in dependencies) {
             write('${dependency.id} ${dependency.toMap()}');
