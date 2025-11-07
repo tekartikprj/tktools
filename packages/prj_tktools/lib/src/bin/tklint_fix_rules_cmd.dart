@@ -105,11 +105,15 @@ Fix rules overrides over another file
       dirs = await recursivePubPath(dirs);
     }
     for (var dir in dirs) {
-      await tklintFixRules(
-        dir,
-        analysisOptionsPath: analysisOptionsPath,
-        options: TklintFixRulesOptions(include: include, verbose: verbose),
-      );
+      try {
+        await tklintFixRules(
+          dir,
+          analysisOptionsPath: analysisOptionsPath,
+          options: TklintFixRulesOptions(include: include, verbose: verbose),
+        );
+      } catch (e) {
+        stderr.writeln('Error fixing rules in $dir: $e');
+      }
     }
     return true;
   }
