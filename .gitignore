@@ -1,3 +1,4 @@
 # Workaround for analyser issue, allow project at root
 /.dart_tool/
 /pubspec.lock
+pubspec_overrides.yaml
