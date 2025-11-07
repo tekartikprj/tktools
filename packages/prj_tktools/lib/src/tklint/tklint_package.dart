@@ -295,11 +295,17 @@ class TkLintRules {
   }
 
   static const _obsoleteRules = [
-    /// Added  2024-11-25
+    /// Added 2024-11-25
     'unsafe_html',
 
-    /// Added  2024-11-25
+    /// Added 2024-11-25
     'package_api_docs',
+
+    // warning - analysis_options.yaml - 'iterable_contains_unrelated_type' was removed in Dart '3.3.0' Remove the reference to 'iterable_contains_unrelated_type'. - removed_lint
+    // warning - analysis_options.yaml - 'list_remove_unrelated_type' was removed in Dart '3.3.0' Remove the reference to 'list_remove_unrelated_type'. - removed_lint
+    /// added 2025-11-07
+    'iterable_contains_unrelated_type',
+    'list_remove_unrelated_type',
   ];
 
   /// Remove obsolete rules
