@@ -3,6 +3,7 @@ import 'package:dev_build/shell.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_crypto/encrypt.dart';
 import 'package:tekartik_app_crypto/password_generator.dart';
+export 'package:tekartik_prj_tktools/src/dsenv/key_value_io.dart';
 
 ShellEnvironment get _shellEnvironment => ShellEnvironment()
   ..aliases['dsvar'] =

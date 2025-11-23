@@ -10,4 +10,8 @@ export 'src/dsenv.dart'
         dsUserEnvGetEncryptedVarOrNullSync,
         dsUserEnvGetVarOrNull,
         dsUserEnvGetVarOrNullSync,
-        dsUserClearVar;
+        dsUserClearVar,
+        keyValuesEncryptedMenu,
+        KeyValueEncryptedIoExt,
+        KeyValueListEncryptedIoExt,
+        KeyValueKeyEncryptedIoExt;
