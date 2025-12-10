@@ -17,6 +17,7 @@ dependencies:
   process_run: ">=1.2.4"
   source_span: ">=1.10.1"
   sembast: ">=3.8.5+1"
+  cli_util: ">=0.4.2"
   tekartik_app_common_prefs:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
