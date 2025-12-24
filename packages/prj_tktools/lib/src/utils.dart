@@ -60,6 +60,7 @@ Future<String?> _tkPubFindGithubTopOrNull({String? dirPath}) async {
 }
 
 /// Find tekartik github top
+@Deprecated('Use tkPubFindGithubTop')
 String findGithubTop(String dirPath) {
   var dir = _findGithubTopOrNull(dirPath);
   if (dir != null) {

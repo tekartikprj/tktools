@@ -338,7 +338,9 @@ class TkPubDepsManager {
                   .deepClone();
             } catch (_) {}
 
-            var githubTop = normalize(absolute(findGithubTop(path)));
+            var githubTop = normalize(
+              absolute(await tkPubFindGithubTop(dirPath: path)),
+            );
             var existing = pubspecOverridesMap['dependency_overrides']
                 ?.anyAs<Map?>()
                 ?.deepClone();

@@ -47,7 +47,9 @@ tkpub copy_files package file1 [file2 file3...] [--dir destination_dir]
     var package = await dbAction((db) async {
       return await db.getPackage(packageName);
     });
-    var githubTop = normalize(absolute(findGithubTop(path)));
+    var githubTop = normalize(
+      absolute(await tkPubFindGithubTop(dirPath: path)),
+    );
 
     var dependencyLocalPath = getDependencyLocalPath(
       githubTop: githubTop,

@@ -52,7 +52,9 @@ tkpub symlink giturl1 [giturl2]
     var dbPackages = allDbPackages.where(
       (dbPackage) => (packages.contains(dbPackage.id)),
     );
-    var githubTop = normalize(absolute(findGithubTop(path)));
+    var githubTop = normalize(
+      absolute(await tkPubFindGithubTop(dirPath: path)),
+    );
     for (var package in dbPackages) {
       var dependencyPath = joinAll([
         getDependencyGithubPath(
