@@ -3,16 +3,15 @@ import 'package:dev_build/shell.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_app_crypto/encrypt.dart';
 import 'package:tekartik_app_crypto/password_generator.dart';
-export 'package:tekartik_prj_tktools/src/dsenv/key_value_io.dart';
+import 'package:tekartik_test_menu_io/key_value_io.dart' as kv;
 
-ShellEnvironment get _shellEnvironment => ShellEnvironment()
-  ..aliases['dsvar'] =
-      'dart run --verbosity error process_run:shell env --user var';
+export 'package:tekartik_prj_tktools/src/dsenv/key_value_io.dart';
 
 var _processRunGlobalReady = () async {
   await checkAndActivatePackage('process_run');
 }();
 var _testEnVar = 'TEST_ENV_VAR';
+
 Future<void> main() async {
   await dsUserEnvSetVar(_testEnVar, null);
   await dsUserEnvSetEncryptedVar(_testEnVar, 'some value');
@@ -100,16 +99,10 @@ Future<void> dsUserClearVar(String name) async {
 
 /// Set an environment variable
 Future<void> dsUserEnvSetVar(String name, String? value) async {
-  await _processRunGlobalReady;
-  var shell = Shell(environment: _shellEnvironment);
   if (value == null) {
-    await shell.run('''
-        dsvar delete $name
-        ''');
+    await kv.deleteEnvVar(name, user: true);
   } else {
-    await shell.run('''
-        dsvar set $name $value
-        ''');
+    await kv.setEnvVar(name, value, user: true);
   }
   // Force reload
   shellEnvironment = null;
@@ -119,22 +112,15 @@ Future<void> dsUserEnvSetVar(String name, String? value) async {
 Future<void> dsUserEnvSetEncryptedVar(String name, String? value) async {
   await _processRunGlobalReady;
 
-  var shell = Shell(environment: _shellEnvironment);
   var encryptedVarName = _encryptedVarName(name);
   var passwordVarName = _passwordVarName(name);
   if (value == null) {
-    await shell.run('''
-        dsvar delete $encryptedVarName
-        dsvar delete $passwordVarName
-        ''');
+    await dsUserEnvSetVar(encryptedVarName, null);
+    await dsUserEnvSetVar(passwordVarName, null);
   } else {
     var password = generatePassword();
     var encrypted = aesEncrypt(value, password);
-    await shell.run('''
-        dsvar set $encryptedVarName $encrypted
-        dsvar set $passwordVarName $password
-        ''');
+    await dsUserEnvSetVar(encryptedVarName, encrypted);
+    await dsUserEnvSetVar(passwordVarName, password);
   }
-  // Force reload
-  shellEnvironment = null;
 }

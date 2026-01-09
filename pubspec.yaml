@@ -4,3 +4,8 @@ environment:
   sdk: ^3.9.0
 workspace:
   - packages/prj_tktools
+dependencies:
+  tekartik_test_menu_io:
+    git:
+      url: https://github.com/tekartik/test_menu.dart
+      path: test_menu_io

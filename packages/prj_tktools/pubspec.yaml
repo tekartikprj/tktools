@@ -63,6 +63,10 @@ dependencies:
       url: https://github.com/tekartik/app_common_utils.dart
       path: app_dev_menu
   http:
+  tekartik_test_menu_io:
+    git:
+      url: https://github.com/tekartik/test_menu.dart
+      path: test_menu_io
 dev_dependencies:
   lints: ">=6.0.0"
   test: ">=1.26.3"
