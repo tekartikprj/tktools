@@ -21,6 +21,21 @@ extension TkPubPackageExt on TkPubPackage {
     return await hasDependency(_buildRunnerPackageName);
   }
 
+  /// Analyze the package
+  Future<void> analyze() async {
+    if (isFlutter) {
+      await shell.run('''
+      # Analyze code
+      flutter analyze --no-pub .
+    ''');
+    } else {
+      await shell.run('''
+      # Analyze code
+      dart analyze --fatal-warnings --fatal-infos .
+  ''');
+    }
+  }
+
   /// Check if the package has a specific dependency
   Future<bool> hasDependency(String packageName) async {
     return pubspecYamlHasAnyDependencies(pubspecYaml, [packageName]);
