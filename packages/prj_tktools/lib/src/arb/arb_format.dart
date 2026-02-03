@@ -1,10 +1,9 @@
 import 'package:cv/cv.dart';
-import 'package:dev_build/package.dart';
 import 'package:fs_shim/utils/io/read_write.dart';
 import 'package:path/path.dart';
 import 'package:process_run/stdio.dart';
 import 'package:tekartik_common_utils/json_utils.dart';
-import 'package:tekartik_prj_tktools/yaml_edit.dart';
+import 'package:tekartik_prj_tktools/src/arb/arb_gen.dart';
 
 int _compareKeys(String key1, String key2) {
   if (key1.startsWith('@@')) {
@@ -35,19 +34,12 @@ int _compareKeys(String key1, String key2) {
 /// Formats arb files in the lib/l10n directory
 Future<void> arbFormat({String? path, bool? verbose}) async {
   verbose ??= false;
-  await recursivePackagesRun(
-    [path ?? '.'],
+  await arbRecursive(
+    path: path,
+    verbose: verbose,
+
     action: (path) async {
-      stdout.writeln('Running ${absolute(path)}');
-      var l10nDir = Directory(join(path, 'lib', 'l10n'));
-      var l10nFile = File(join(path, 'l10n.yaml'));
-      if (l10nFile.existsSync()) {
-        var l10Map = loadYaml(l10nFile.readAsStringSync()) as Map;
-        var arbDir = l10Map['arb-dir'] as String?;
-        if (arbDir != null) {
-          l10nDir = Directory(join(path, arbDir));
-        }
-      }
+      var l10nDir = arbL10nDirectory(path);
       // print('Looking for l10n dir at ${l10nDir.path}');
       if (l10nDir.existsSync()) {
         await for (var file in l10nDir.list()) {
