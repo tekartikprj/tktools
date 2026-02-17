@@ -112,14 +112,23 @@ class TkPubTopPath {
 
   /// Recursive action for build runners
   Future<void> recursiveBuildRunnerActions(
-    Future<void> Function(String path) action,
-  ) async {
-    return shellStdioLinesGrouper.runZoned(() async {
-      await recursiveActions(
-        [path],
-        action: action,
-        dependencies: ['build_runner'],
-      );
-    });
+    Future<void> Function(String path) action, {
+    bool? noLinesGrouper,
+  }) async {
+    noLinesGrouper ??= false;
+    await recursiveActions(
+      [path],
+      action: (path) async {
+        if (noLinesGrouper ?? false) {
+          await action(path);
+          return;
+        }
+        return await shellStdioLinesGrouper.runZoned(() async {
+          await action(path);
+        });
+      },
+      poolSize: (noLinesGrouper) ? 100 : null,
+      dependencies: ['build_runner'],
+    );
   }
 }
