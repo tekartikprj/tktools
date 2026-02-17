@@ -1,7 +1,6 @@
-import 'dart:io';
-
-import 'package:dev_build/build_support.dart';
 import 'package:dev_build/menu/menu_run_ci.dart';
+import 'package:process_run/stdio.dart';
+import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 
 /// Alias for PubIoPackage
 typedef TkPubPackage = PubIoPackage;
@@ -71,14 +70,56 @@ extension TkPubPackageExt on TkPubPackage {
     return false;
   }
 
+  /// Compat
+  @Deprecated('Use tryBuildRunnerWatch')
+  Future<bool> tryWatch({bool? deleteConflictingOutput}) =>
+      tryBuildRunnerWatch(deleteConflictingOutput: deleteConflictingOutput);
+
   /// Try to run build_runner watch
-  Future<bool> tryWatch() async {
+  Future<bool> tryBuildRunnerWatch({bool? deleteConflictingOutput}) async {
+    deleteConflictingOutput ??= false;
     if (await _checkBuildRunnerSetup()) {
       await shell.run(
-        'dart run build_runner watch --delete-conflicting-outputs',
+        'dart run build_runner watch'
+        '${deleteConflictingOutput ? ' --delete-conflicting-outputs' : ''}',
       );
       return true;
     }
     return false;
+  }
+
+  /// Try to run build_runner watch
+  Future<bool> tryBuildRunnerBuild({bool? deleteConflictingOutput}) async {
+    deleteConflictingOutput ??= false;
+    if (await _checkBuildRunnerSetup()) {
+      await shell.run(
+        'dart run build_runner build'
+        '${deleteConflictingOutput ? ' --delete-conflicting-outputs' : ''}',
+      );
+      return true;
+    }
+    return false;
+  }
+}
+
+/// Top path
+class TkPubTopPath {
+  /// Actual path
+  final String path;
+
+  /// Top path
+  TkPubTopPath({this.path = '.'});
+
+  /// Recursive action for build runners
+  Future<void> recursiveBuildRunnerActions(
+    Future<void> Function(String path) action,
+  ) async {
+    return shellStdioLinesGrouper.runZoned(() async {
+      await recursiveActions(
+        [path],
+        action: action,
+        dependencies: ['build_runner'],
+      );
+    });
   }
 }

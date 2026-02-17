@@ -15,5 +15,5 @@ export 'src/tkpub_db.dart'
         //tkPubConfigRefRecord,
         //tkPubPackagesStore,
         TkPubDbPackage;
-export 'src/tkpub_io_pkg.dart' show TkPubPackage, TkPubPackageExt;
+export 'src/tkpub_io_pkg.dart' show TkPubPackage, TkPubPackageExt, TkPubTopPath;
 export 'src/utils.dart' show tkPubFindGithubTop;
