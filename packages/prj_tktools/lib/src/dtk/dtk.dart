@@ -10,6 +10,9 @@ const dtkGitExportPathGlobalPrefsKey = 'com.tekartik.dtk.gitExportPath';
 /// Prefs key for the dep export path
 const dtkDepExportPathGlobalPrefsKey = 'com.tekartik.dtk.depExportPath';
 
+/// Prefs key for host env export path
+const dtkHostEnvExportPathGlobalPrefsKey = 'com.tekartik.dtk.hostEnvExportPath';
+
 /// common extension
 extension DtkFileExt on File {
   /// Write file at path if needed
@@ -46,14 +49,24 @@ extension DtkFileExt on File {
 /// Get git export path
 Future<String?> dtkGetGitExportPath() async {
   var prefs = await openGlobalPrefsPrefs();
-  var path = prefs.getString(dtkGitExportPathGlobalPrefsKey);
+  var path = await prefs.getString(dtkGitExportPathGlobalPrefsKey);
   return path;
 }
 
 /// Get dep export path
 Future<String?> dtkGetDepExportPath() async {
   var prefs = await openGlobalPrefsPrefs();
-  var path = prefs.getString(dtkDepExportPathGlobalPrefsKey);
+  var path = await prefs.getString(dtkDepExportPathGlobalPrefsKey);
+  return path;
+}
+
+/// Get dep export path
+Future<String> dtkGetHostEnvExportPath() async {
+  var prefs = await openGlobalPrefsPrefs();
+  var path = await prefs.getString(dtkHostEnvExportPathGlobalPrefsKey);
+  if (path == null) {
+    throw StateError('host env export path not set');
+  }
   return path;
 }
 
