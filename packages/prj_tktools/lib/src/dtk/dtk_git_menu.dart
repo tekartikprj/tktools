@@ -207,6 +207,9 @@ class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
     );
     var foundRepos = <String>[];
     for (var repo in repos) {
+      if (repo.omit.v ?? false) {
+        continue;
+      }
       var repoPath = repo.id;
       var path = join(gitTop, repoPath);
       if (Directory(path).existsSync()) {
@@ -524,6 +527,15 @@ void dtkGitMenu() {
         if (id.trimmedNonEmpty() != null) {
           await dtkGitConfigDbAction((db) async {
             var repo = await db.deleteRepository(id);
+            write(repo);
+          }, write: true);
+        }
+      });
+      item('toggle omit by id (prompt)', () async {
+        var id = await prompt('id');
+        if (id.trimmedNonEmpty() != null) {
+          await dtkGitConfigDbAction((db) async {
+            var repo = await db.toggleOmit(id);
             write(repo);
           }, write: true);
         }

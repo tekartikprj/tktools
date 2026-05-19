@@ -22,8 +22,11 @@ class DbDtkGitRepository extends DbStringRecordBase {
 
   /// tags (public, main, project specific)
   final tags = CvListField<String>('tags');
+
+  /// True means it should be omitted in actions
+  final omit = CvField<bool>('omit');
   @override
-  CvFields get fields => [gitUrl, gitRef, tags];
+  CvFields get fields => [gitUrl, gitRef, tags, omit];
 }
 
 /// Extension
@@ -78,6 +81,24 @@ extension DtkGitConfigDbExt on DtkConfigDb {
       return true;
     }
     return false;
+  }
+
+  /// Toggle
+  Future<bool> toggleOmit(String id) async {
+    return await db.transaction((txn) async {
+      var record = dtkGitDbRepositoryStore.record(id);
+      var repo = await record.get(txn);
+      if (repo == null) {
+        return false;
+      }
+      if (repo.omit.v == true) {
+        repo.omit.clear();
+      } else {
+        repo.omit.v = true;
+      }
+      await record.put(txn, repo);
+      return true;
+    });
   }
 
   /// set/update a Repository
