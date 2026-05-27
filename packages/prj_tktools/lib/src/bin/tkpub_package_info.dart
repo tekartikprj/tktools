@@ -73,7 +73,7 @@ class TkPubPackageInfo {
         case 'pubspec_overrides':
           return TkPubTarget.pubspecOverrides;
       }
-      throw 'Invalid target: $part';
+      throw StateError('Invalid target: $part');
     }
 
     String getName(int partIndex) {
