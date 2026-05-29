@@ -3,15 +3,6 @@ import 'package:tekartik_prj_tktools/dtk.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
 export 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
-/// Db config ref
-class DbDtkDepConfigRef extends DbStringRecordBase {
-  /// git ref (dart3a)
-  final gitRef = CvField<String>('gitRef');
-
-  @override
-  CvFields get fields => [gitRef];
-}
-
 /// Db Dependency config
 class DbDtkDepDependency extends DbStringRecordBase {
   /// min version
@@ -32,18 +23,6 @@ extension DtkDepConfigDbExt on DtkConfigDb {
   /// Constructor
   void initBuilders() {
     _initBuilders();
-  }
-
-  /// Get config
-  Future<DbDtkDepConfigRef?> getConfig() async {
-    var config = await dtkDepDbConfigRefRecord.get(db);
-    return config;
-  }
-
-  /// Set config
-  Future<DbDtkDepConfigRef> setConfig(DbDtkDepConfigRef ref) async {
-    var config = await dtkDepDbConfigRefRecord.put(db, ref);
-    return config;
   }
 
   /// Get all Dependencies
@@ -97,16 +76,11 @@ var dtkDepDbConfigStore = cvStringStoreFactory.store<DbRecord<String>>(
   'config',
 );
 
-/// Config ref record.
-var dtkDepDbConfigRefRecord = dtkDepDbConfigStore
-    .cast<String, DbDtkDepConfigRef>()
-    .record('ref');
-
 late String _configExportPath;
 var _initialized = false;
 
 void _initBuilders() {
-  cvAddConstructors([DbDtkDepConfigRef.new, DbDtkDepDependency.new]);
+  cvAddConstructors([DbDtkDepDependency.new]);
 }
 
 Future<String> _dtkGetDepConfigExportPath({String? configExportPath}) async {

@@ -7,7 +7,7 @@ import 'package:tekartik_prj_tktools/src/tkpub.dart';
 const prefsKeyConfigExportPath = 'path';
 
 /// Db config ref
-class DbConfigRef extends DbStringRecordBase {
+class TkPubDbConfigRef extends DbStringRecordBase {
   /// git ref (dart3a)
   final gitRef = CvField<String>('gitRef');
 
@@ -29,6 +29,9 @@ class TkPubDbPackage extends DbStringRecordBase {
   /// published (hosted)
   final published = CvField<String>('published');
 
+  /// The package name is the id
+  String get packageName => id;
+
   @override
   CvFields get fields => [gitUrl, gitPath, gitRef, published];
 }
@@ -48,6 +51,24 @@ extension TkPubConfigDbExt on TkPubConfigDb {
       return true;
     }
     return false;
+  }
+
+  /// Get config
+  Future<TkPubDbConfigRef?> getConfig() async {
+    var config = await tkPubConfigRefRecord.get(db);
+    return config;
+  }
+
+  /// Set config
+  Future<TkPubDbConfigRef> setConfig(TkPubDbConfigRef ref) async {
+    var config = await tkPubConfigRefRecord.put(db, ref);
+    return config;
+  }
+
+  /// Get all packages
+  Future<List<TkPubDbPackage>> getAllPackages() async {
+    var packages = await tkPubPackagesStore.query().getRecords(db);
+    return packages;
   }
 
   /// set/update a package
@@ -106,7 +127,7 @@ var tkPubPackagesStore = cvStringStoreFactory.store<TkPubDbPackage>('packages');
 var configStore = cvStringStoreFactory.store<DbRecord<String>>('config');
 
 /// Config ref record.
-var tkPubConfigRefRecord = configStore.cast<String, DbConfigRef>().record(
+var tkPubConfigRefRecord = configStore.cast<String, TkPubDbConfigRef>().record(
   'ref',
 );
 
@@ -114,7 +135,7 @@ late String _configExportPath;
 var _initialized = false;
 
 void _initBuilders() {
-  cvAddConstructors([TkPubDbPackage.new, DbConfigRef.new]);
+  cvAddConstructors([TkPubDbPackage.new, TkPubDbConfigRef.new]);
 }
 
 Future<String> _tkPubGetConfigExportPath({String? configExportPath}) async {
@@ -154,7 +175,7 @@ Future<T> tkPubDbAction<T>(
 /// Get all packages
 Future<List<TkPubDbPackage>> tkPubGetAllPackages() async {
   return await tkPubDbAction((db) async {
-    var packages = await tkPubPackagesStore.query().getRecords(db.database);
+    var packages = await db.getAllPackages();
     return packages;
   });
 }

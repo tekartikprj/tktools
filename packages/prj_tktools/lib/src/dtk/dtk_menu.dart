@@ -4,6 +4,7 @@ import 'package:tekartik_prj_tktools/src/dtk/dtk_prj_menu.dart';
 
 import 'dtk_dep_menu.dart';
 import 'dtk_git_menu.dart';
+import 'dtk_pub_menu.dart';
 
 Future<void> main(List<String> args) async {
   mainMenuConsole(args, dtkMenu);
@@ -25,5 +26,8 @@ void _dtkMenu({required String path}) {
   });
   menu('prj', () {
     dtkPrjMenu(path: path);
+  });
+  menu('pub', () {
+    dtkPubMenu();
   });
 }

@@ -73,6 +73,19 @@ class TkLintPackage {
     return join(this.path, path);
   }
 
+  /// Get all rules
+  Future<TkLintRules> getAllRules({
+    String? analysisOptionFile,
+    bool? handleInclude,
+    bool? fromInclude,
+  }) async {
+    return await getRules(
+      analysisOptionFile ?? 'analysis_options.yaml',
+      handleInclude: handleInclude,
+      fromInclude: fromInclude,
+    );
+  }
+
   /// Get rules
   /// [handleInclude] should be true to list all the rules
   /// [fromInclude] should be true to list the real difference with the included
@@ -222,7 +235,8 @@ class TkLintRules {
     this.rules = rules != null ? List.of(rules) : <TkLintRule>[];
   }
 
-  void _removeRuleNames(List<String> ruleNames) {
+  /// Remove rules with names in [ruleNames]
+  void removeRuleNames(List<String> ruleNames) {
     rules.removeWhere((element) => ruleNames.contains(element.name));
   }
 
@@ -232,7 +246,7 @@ class TkLintRules {
 
   /// Merge (rules overrides existing rules)
   void merge(TkLintRules rules) {
-    _removeRuleNames(rules._ruleNames);
+    removeRuleNames(rules._ruleNames);
     this.rules.addAll(rules.rules);
   }
 
@@ -306,6 +320,9 @@ class TkLintRules {
     /// added 2025-11-07
     'iterable_contains_unrelated_type',
     'list_remove_unrelated_type',
+
+    // added 2026-05-29
+    'avoid_null_checks_in_equality_operators',
   ];
 
   /// Remove obsolete rules
