@@ -1,7 +1,9 @@
-import 'package:tekartik_app_common_prefs/app_prefs.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
+import 'package:tekartik_prefs/prefs.dart';
 import 'package:tekartik_prj_tktools/dtk.dart';
 import 'package:tekartik_prj_tktools/src/tkpub.dart';
+
+import 'dock.dart';
 
 /// path prefs key.
 const prefsKeyConfigExportPath = 'path';

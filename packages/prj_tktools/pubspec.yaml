@@ -18,18 +18,14 @@ dependencies:
   source_span: ">=1.10.2"
   sembast: ">=3.8.5+1"
   cli_util: ">=0.4.2"
-  tekartik_app_common_prefs:
+  tekartik_app_dock:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
-      path: app_prefs
+      path: app_dock
   tekartik_app_cv_sembast:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
       path: app_cv_sembast
-  tekartik_app_sembast:
-    git:
-      url: https://github.com/tekartik/app_common_utils.dart
-      path: app_sembast
   tekartik_common_utils:
     git:
       url: https://github.com/tekartik/common_utils.dart
@@ -45,7 +41,7 @@ dependencies:
     git:
       url: https://github.com/tekartik/prefs.dart
       path: prefs
-  sqflite_common_ffi: ">=2.3.6"
+  # sqflite_common_ffi: ">=2.3.6"
   tekartik_app_crypto:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
@@ -67,6 +63,10 @@ dependencies:
     git:
       url: https://github.com/tekartik/test_menu.dart
       path: test_menu_io
+  tekartik_prefs_sembast:
+    git:
+      url: https://github.com/tekartik/prefs.dart
+      path: prefs_sembast
 dev_dependencies:
   lints: ">=6.1.0"
   test: ">=1.31.0"

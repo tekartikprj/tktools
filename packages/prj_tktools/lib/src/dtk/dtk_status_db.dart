@@ -1,6 +1,7 @@
+import 'package:path/path.dart';
 import 'package:sembast/timestamp.dart';
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
-import 'package:tekartik_app_sembast/sembast.dart';
+import 'package:tekartik_prj_tktools/src/dock.dart';
 
 /// Db timepoint
 /// Time in history
@@ -121,9 +122,16 @@ final dbDtkActionFindDartProjectModel = DbDtkActionFindDartProject();
 final dbDtkTimepointModel = DbDtkTimepoint();
 
 /// Open the dtk status db
-Future<DtkStatusDb> dtkStatusDbOpen() async {
-  var factory = getDatabaseFactory(packageName: 'com.tekartik.dtk');
-  var db = await factory.openDatabase('status.db');
+Future<DtkStatusDb> dtkStatusDbOpen({DatabaseFactory? factory}) async {
+  String? path;
+
+  if (factory == null) {
+    factory ??= getSembastFactory();
+    var packageName = 'com.tekartik.dtk';
+    path = join(getDockUserPath(packageName: packageName), 'sembast_databases');
+  }
+
+  var db = await factory.openDatabase(joinAll([?path, 'status.db']));
   return DtkStatusDb(db);
 }
 

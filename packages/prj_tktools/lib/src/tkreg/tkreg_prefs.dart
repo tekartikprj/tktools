@@ -1,4 +1,5 @@
-import 'package:tekartik_app_common_prefs/app_prefs_async.dart';
+import 'package:tekartik_prefs/prefs_async.dart';
+import 'package:tekartik_prj_tktools/src/dock.dart';
 
 /// Open the prefs
 Future<PrefsAsync> openGlobalPrefsPrefs() async {
