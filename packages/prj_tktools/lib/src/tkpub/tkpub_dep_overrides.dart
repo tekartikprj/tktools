@@ -15,7 +15,7 @@ class TkPubDepOverrides {
 
   /// The `.pubspec_overrides.yaml` file (disabled version).
   File get disabledOverridesFile =>
-      File(join(rootPath, '.pubspec_overrides.yaml'));
+      File(join(rootPath, '.local_pubspec_overrides.yaml'));
 
   /// Returns true if overrides file exists.
   bool get exists => overridesFile.existsSync();
