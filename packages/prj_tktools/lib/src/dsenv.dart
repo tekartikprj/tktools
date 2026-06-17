@@ -124,3 +124,7 @@ Future<void> dsUserEnvSetEncryptedVar(String name, String? value) async {
     await dsUserEnvSetVar(passwordVarName, password);
   }
 }
+
+/// Dtk host name
+String get dtkHostname =>
+    shellEnvironment['DTK_HOSTNAME'] ?? Platform.localHostname;

@@ -14,4 +14,5 @@ export 'src/dsenv.dart'
         keyValuesEncryptedMenu,
         KeyValueEncryptedIoExt,
         KeyValueListEncryptedIoExt,
-        KeyValueKeyEncryptedIoExt;
+        KeyValueKeyEncryptedIoExt,
+        dtkHostname;
