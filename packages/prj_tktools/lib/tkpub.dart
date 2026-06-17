@@ -7,6 +7,7 @@ export 'src/tkpub.dart'
         tkPubGetConfigExportPath,
         tkPubGetPackageConfigMap,
         tkPubExportPathGlobalPrefsKey;
+export 'src/tkpub/tkpub_dep_overrides.dart' show TkPubDepOverrides;
 export 'src/tkpub_db.dart'
     show
         tkPubDbAction,
