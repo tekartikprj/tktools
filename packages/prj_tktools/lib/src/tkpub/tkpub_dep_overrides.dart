@@ -61,8 +61,9 @@ class TkPubDepOverrides {
       } catch (_) {}
     }
 
-    var docMap =
-        doc != null ? Map<String, dynamic>.from(doc) : <String, dynamic>{};
+    var docMap = doc != null
+        ? Map<String, dynamic>.from(doc)
+        : <String, dynamic>{};
     docMap['dependency_overrides'] = overridesMap;
 
     var newYamlText = mapToYaml(docMap);
@@ -76,20 +77,23 @@ class TkPubDepOverrides {
       if (disabledExists) {
         if (verbose) {
           stdout.writeln(
-              'Removing existing disabled overrides file: ${disabledOverridesFile.path}');
+            'Removing existing disabled overrides file: ${disabledOverridesFile.path}',
+          );
         }
         try {
           await disabledOverridesFile.delete();
         } catch (e) {
           stderr.writeln(
-              'Error: Failed to delete existing ${disabledOverridesFile.path}: $e');
+            'Error: Failed to delete existing ${disabledOverridesFile.path}: $e',
+          );
           return false;
         }
       }
       try {
         await overridesFile.rename(disabledOverridesFile.path);
         stdout.writeln(
-            'Disabled overrides: renamed ${overridesFile.path} to ${disabledOverridesFile.path}');
+          'Disabled overrides: renamed ${overridesFile.path} to ${disabledOverridesFile.path}',
+        );
       } catch (e) {
         stderr.writeln('Error: Failed to rename overrides file: $e');
         return false;
@@ -97,7 +101,9 @@ class TkPubDepOverrides {
       return true;
     } else {
       if (verbose) {
-        stdout.writeln('No pubspec_overrides.yaml found to disable at $rootPath');
+        stdout.writeln(
+          'No pubspec_overrides.yaml found to disable at $rootPath',
+        );
       }
       return true;
     }
