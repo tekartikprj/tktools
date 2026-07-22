@@ -105,7 +105,7 @@ extension TkPubConfigDbExt on TkPubConfigDb {
     return package;
   }
 
-  /// Constructor
+  /// Initializes database CV model builders.
   void initBuilders() {
     _initBuilders();
   }

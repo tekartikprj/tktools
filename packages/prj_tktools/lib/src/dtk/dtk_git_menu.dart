@@ -55,14 +55,14 @@ abstract class DtkActionRunner<T extends DbDtkAction> {
     _poolOrNull ??= Pool(concurrency);
   }
 
-  /// constructor
+  /// Creates a [DtkActionRunner] with [db] database and [action].
   DtkActionRunner(this.db, {required this.action});
 }
 
 /// dtk find dart project action runner
 class DtkDartProjectActionRunner
     extends DtkActionRunner<DbDtkActionPubUpgrade> {
-  /// constructor
+  /// Creates a [DtkDartProjectActionRunner] with [db] database and [action].
   DtkDartProjectActionRunner(super.db, {required super.action});
 
   @override
@@ -132,7 +132,7 @@ Pool? _poolOrNull;
 /// dtk find dart project action runner
 class DtkFindDartProjectActionRunner
     extends DtkActionRunner<DbDtkActionFindDartProject> {
-  /// constructor
+  /// Creates a [DtkFindDartProjectActionRunner] with [db] database.
   DtkFindDartProjectActionRunner(super.db)
     : super(action: actionFindDartProjects);
 
@@ -183,7 +183,7 @@ class DtkFindDartProjectActionRunner
 
 /// dtk find dart project action runner
 class DtkFindReposActionRunner extends DtkActionRunner<DbDtkActionFindRepos> {
-  /// constructor
+  /// Creates a [DtkFindReposActionRunner] with [db] database.
   DtkFindReposActionRunner(super.db) : super(action: actionFindRepos);
 
   @override

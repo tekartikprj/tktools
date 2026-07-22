@@ -47,7 +47,7 @@ class TkPubDepsManagerOptions {
   /// Force
   final bool force;
 
-  /// Constructor
+  /// Creates a [TkPubDepsManagerOptions] instance with dependency processing options.
   TkPubDepsManagerOptions({
     bool? pubspecOverrides,
     bool? recursive,
@@ -76,7 +76,7 @@ class TkPubDepsManager {
   /// Path
   final String path;
 
-  /// Constructor
+  /// Creates a [TkPubDepsManager] instance for the given directory [path] and [options].
   TkPubDepsManager({String? path, TkPubDepsManagerOptions? options})
     : path = path ?? '.',
       options = options ?? TkPubDepsManagerOptions();

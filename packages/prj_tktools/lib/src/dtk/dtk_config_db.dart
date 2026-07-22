@@ -20,7 +20,7 @@ class DtkConfigDb {
   /// True for verbose mode
   final bool verbose;
 
-  /// Constructor
+  /// Creates a [DtkConfigDb] with [database], optional [exportPath], [write], and [verbose] options.
   const DtkConfigDb({
     required this.database,
     this.exportPath,

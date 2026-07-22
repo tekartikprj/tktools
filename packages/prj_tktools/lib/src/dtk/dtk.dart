@@ -78,10 +78,10 @@ class DtkGitRepositoryRef {
   /// Example tekartik/app_common_utils.dart
   late final String path;
 
-  /// Constructor
+  /// Creates a [DtkGitRepositoryRef] with required [host] and [path].
   DtkGitRepositoryRef({required this.host, required this.path});
 
-  /// Constructor from url
+  /// Creates a [DtkGitRepositoryRef] parsed from the given git [gitUrl].
   DtkGitRepositoryRef.fromUrl(String gitUrl) {
     List<String> parts;
     String host;

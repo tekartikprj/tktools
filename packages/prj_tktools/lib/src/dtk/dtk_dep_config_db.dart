@@ -20,7 +20,7 @@ extension DtkDepConfigDbExt on DtkConfigDb {
   /// the sembast db
   Database get db => database;
 
-  /// Constructor
+  /// Initializes database CV model builders.
   void initBuilders() {
     _initBuilders();
   }

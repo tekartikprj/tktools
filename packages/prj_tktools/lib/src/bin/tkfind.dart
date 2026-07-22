@@ -76,7 +76,7 @@ class FinderOptions {
   /// Extensions to match
   final List<String> exts;
 
-  /// Constructor for FinderOptions
+  /// Creates a [FinderOptions] instance with matching filters and display options.
   FinderOptions({
     required this.words,
     required this.fileOnly,
