@@ -273,6 +273,51 @@ class DtkProject {
     await recurse(path);
   }
 
+  /// Get sub projects in inner directories (excluding self and sub-workspaces)
+  Future<List<String>> getSubProjects() async {
+    var list = <String>[];
+    var normalizedPath = normalize(absolute(path));
+
+    Future<void> recurse(String dirPath) async {
+      Stream<FileSystemEntity> stream;
+      try {
+        stream = Directory(dirPath).list(followLinks: false);
+      } catch (_) {
+        return;
+      }
+      await for (var entity in stream) {
+        if (entity is Directory) {
+          var name = basename(entity.path);
+          if (_isToBeIgnored(name)) {
+            continue;
+          }
+          var subPath = entity.path;
+          if (normalize(absolute(subPath)) == normalizedPath) {
+            continue;
+          }
+          var pubspecFile = File(join(subPath, 'pubspec.yaml'));
+          if (pubspecFile.existsSync()) {
+            try {
+              var pubIoPackage = PubIoPackage(subPath);
+              await pubIoPackage.ready;
+              if (pubIoPackage.isWorkspace) {
+                // Skip sub-workspaces and their trees
+                continue;
+              }
+              list.add(subPath);
+            } catch (e) {
+              stderr.writeln('Error checking project $subPath: $e');
+            }
+          }
+          await recurse(subPath);
+        }
+      }
+    }
+
+    await recurse(path);
+    list.sort();
+    return list;
+  }
 
   /// Add all projects (inner directories) to workspace
   Future<void> clearDependencyOverrides() async {

@@ -1,5 +1,6 @@
 import 'package:dev_build/menu/menu_io.dart';
 import 'package:dev_build/menu/menu_run_ci.dart';
+import 'package:fs_shim/utils/path.dart' show toPosixPath;
 import 'package:path/path.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_prj.dart';
@@ -74,8 +75,36 @@ void _dtkPrjMenu({required String path}) {
         },
       );
       item('pick subproject and add to root', () async {
-        // List all possible dart project (not a workspace, add a check if already in the workspace)
-        // Add the picket one to the workspace
+        var subProjects = await prj.getSubProjects();
+        if (subProjects.isEmpty) {
+          write('No subprojects found');
+          return;
+        }
+        var existingWorkspaceMembers = <String>{};
+        try {
+          var rootPubspecMap = await pathGetPubspecYamlMap(path);
+          var workspace = rootPubspecMap['workspace'];
+          if (workspace is List) {
+            existingWorkspaceMembers.addAll(workspace.map((e) => e.toString()));
+          }
+        } catch (_) {}
+        await showMenu(() {
+          for (var subPath in subProjects) {
+            var relativePath = toPosixPath(relative(subPath, from: path));
+            var inWorkspace = existingWorkspaceMembers.contains(relativePath);
+            var label =
+                '$relativePath${inWorkspace ? ' (already in workspace)' : ''}';
+            item(label, () async {
+              if (inWorkspace) {
+                write('$relativePath is already in workspace');
+              } else {
+                write('Adding $relativePath to workspace');
+                await DtkProject(subPath).addToWorkspace();
+                await popMenu();
+              }
+            });
+          }
+        });
       });
 
       item('clear non-workspace overrides', () async {
