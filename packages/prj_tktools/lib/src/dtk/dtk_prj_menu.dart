@@ -73,6 +73,11 @@ void _dtkPrjMenu({required String path}) {
           );
         },
       );
+      item('pick subproject and add to root', () async {
+        // List all possible dart project (not a workspace, add a check if already in the workspace)
+        // Add the picket one to the workspace
+      });
+
       item('clear non-workspace overrides', () async {
         await prj.clearSubProjectsDependencyOverrides();
       });

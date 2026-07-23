@@ -219,29 +219,60 @@ class DtkProject {
   Future<void> addAllProjectsToWorkspace({
     bool? keepExistingWorkspaceResolution,
   }) async {
-    /// Safe compare
     var normalizedPath = normalize(absolute(path));
-    await recursiveActions(
-      [path],
-      action: (path) async {
-        if (normalize(absolute(path)) == normalizedPath) {
-          return;
-        }
-        var dtkProject = DtkProject(path);
-        if (keepExistingWorkspaceResolution ?? false) {
-          var pubIoPackage = PubIoPackage(path);
-          await pubIoPackage.ready;
-          if (!pubIoPackage.hasWorkspaceResolution) {
-            stdout.writeln(
-              'Skipping project without workspace resolution: $path',
-            );
-            return;
+
+    Future<void> recurse(String dirPath) async {
+      Stream<FileSystemEntity> stream;
+      try {
+        stream = Directory(dirPath).list(followLinks: false);
+      } catch (_) {
+        return;
+      }
+      await for (var entity in stream) {
+        if (entity is Directory) {
+          var name = basename(entity.path);
+          if (_isToBeIgnored(name)) {
+            continue;
           }
+          var subPath = entity.path;
+          if (normalize(absolute(subPath)) == normalizedPath) {
+            continue;
+          }
+          var pubspecFile = File(join(subPath, 'pubspec.yaml'));
+          if (pubspecFile.existsSync()) {
+            try {
+              var pubIoPackage = PubIoPackage(subPath);
+              await pubIoPackage.ready;
+              if (pubIoPackage.isWorkspace) {
+                // Don't add the project if it is workspace itself and skip going down the tree
+                stdout.writeln(
+                  'Skipping project as it is a workspace itself: $subPath',
+                );
+                continue;
+              }
+              if (keepExistingWorkspaceResolution ?? false) {
+                if (!pubIoPackage.hasWorkspaceResolution) {
+                  stdout.writeln(
+                    'Skipping project without workspace resolution: $subPath',
+                  );
+                  await recurse(subPath);
+                  continue;
+                }
+              }
+              var dtkProject = DtkProject(subPath);
+              await dtkProject.addToWorkspace();
+            } catch (e) {
+              stderr.writeln('Error checking project $subPath: $e');
+            }
+          }
+          await recurse(subPath);
         }
-        await dtkProject.addToWorkspace();
-      },
-    );
+      }
+    }
+
+    await recurse(path);
   }
+
 
   /// Add all projects (inner directories) to workspace
   Future<void> clearDependencyOverrides() async {
@@ -280,4 +311,17 @@ class DtkProject {
       },
     );
   }
+
+  static bool _isToBeIgnored(String baseName) {
+    if (baseName.startsWith('.')) {
+      return true;
+    }
+    return _blackListedTargets.contains(baseName);
+  }
+
+  static final _blackListedTargets = <String>{
+    'build',
+    'deploy',
+    'node_modules',
+  };
 }
