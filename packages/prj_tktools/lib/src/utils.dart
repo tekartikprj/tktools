@@ -23,7 +23,11 @@ Future<String> tkPubFindGitTop({String? dirPath}) async {
 
 /// Find tekartik github top
 Future<String> tkPubFindGithubTop({String? dirPath}) async {
-  return (await _tkPubFindGithubTopOrNull(dirPath: dirPath))!;
+  var top = await _tkPubFindGithubTopOrNull(dirPath: dirPath);
+  if (top == null) {
+    throw StateError('Cannot find top github.com dir');
+  }
+  return top;
 }
 
 /// Find tekartik github top
@@ -60,8 +64,7 @@ Future<String?> _tkPubFindGithubTopOrNull({String? dirPath}) async {
       return dir;
     }
   }
-
-  throw StateError('Cannot find top github.com dir');
+  return null;
 }
 
 /// Find tekartik github top
