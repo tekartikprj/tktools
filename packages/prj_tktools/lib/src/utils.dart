@@ -27,6 +27,11 @@ Future<String> tkPubFindGithubTop({String? dirPath}) async {
 }
 
 /// Find tekartik github top
+Future<String?> tkPubFindGithubTopOrNull({String? dirPath}) async {
+  return (await _tkPubFindGithubTopOrNull(dirPath: dirPath));
+}
+
+/// Find tekartik github top
 Future<String?> _tkPubFindGithubTopOrNull({String? dirPath}) async {
   if (dirPath != null) {
     var dir = _findGithubTopOrNull(dirPath);

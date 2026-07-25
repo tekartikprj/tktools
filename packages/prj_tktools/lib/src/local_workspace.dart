@@ -212,6 +212,7 @@ class LocalWorkspaceHelper {
   String? _cachedConfigContent;
   List<String>? _cachedResolvedFolders;
 
+  /// Load (and cache) the `local_workspace.json` config.
   Future<DtkLocalWorkspace> loadConfig() async {
     var file = configFile;
     if (!file.existsSync()) {
@@ -286,6 +287,7 @@ class LocalWorkspaceHelper {
     }
   }
 
+  /// Get the cached resolved config, if [checkConfig] reports it is up to date.
   Future<DtkResolvedLocalWorkspace?> getResolvedConfig({
     bool force = false,
   }) async {
@@ -321,6 +323,8 @@ class LocalWorkspaceHelper {
     return resolved;
   }
 
+  /// Resolve [config] into absolute/relative folders, without reading or
+  /// writing any cache file.
   Future<DtkResolvedLocalWorkspace> resolve(DtkLocalWorkspace config) async {
     final resolvedList = <DtkResolvedLocalWorkspaceResolved>[];
 
@@ -403,6 +407,7 @@ class LocalWorkspaceHelper {
     return result;
   }
 
+  /// Write [resolved] to [resolvedFile] and [resolvedInputFile], updating the cache.
   Future<void> writeResolved(DtkResolvedLocalWorkspace resolved) async {
     var localDir = Directory(join(path, '.local', 'local_workspace'));
     localDir.createSync(recursive: true);
@@ -533,6 +538,7 @@ class LocalWorkspaceHelper {
     return uniqueFolders;
   }
 
+  /// Write a `<dir_name>.code-workspace` file listing the resolved folders.
   Future<void> setupVsCode(DtkLocalWorkspace config) async {
     var uniqueFolders = await resolveFolders(config);
 
@@ -561,6 +567,8 @@ class LocalWorkspaceHelper {
     stdout.writeln('Created ${workspaceFile.path}');
   }
 
+  /// Write IntelliJ project files (`.idea/modules.xml` and `.idea/<dir_name>.iml`)
+  /// with content roots for the resolved folders.
   Future<void> setupIdea(DtkLocalWorkspace config) async {
     var uniqueFolders = await resolveFolders(config);
 
@@ -665,6 +673,8 @@ ${contentEntries.toString().trimRight()}
     stdout.writeln('Created ${modulesFile.path}');
   }
 
+  /// Update `.claude/settings.json` with the resolved folders added to
+  /// `permissions.additionalDirectories`.
   Future<void> setupClaude(DtkLocalWorkspace config) async {
     var uniqueFolders = await resolveFolders(config);
 
@@ -730,6 +740,8 @@ ${contentEntries.toString().trimRight()}
     }
   }
 
+  /// Update `.gemini/antigravity-cli/settings.json` with read/write
+  /// permissions for the resolved folders.
   Future<void> setupAgy(DtkLocalWorkspace config) async {
     var uniqueFolders = await resolveFolders(config);
 
