@@ -59,11 +59,134 @@ abstract class DtkActionRunner<T extends DbDtkAction> {
   DtkActionRunner(this.db, {required this.action});
 }
 
+/// Status of one dart project for a given action.
+class DtkActionProjectStatus {
+  /// repo/dartProjectPath (relative to the git top)
+  final String path;
+
+  /// [actionResultNone], [actionResultOk] or [actionResultKo]
+  final String status;
+
+  /// Creates a [DtkActionProjectStatus].
+  DtkActionProjectStatus({required this.path, required this.status});
+
+  /// True if the project has been done (or manually validated)
+  bool get isOk => status == actionResultOk;
+
+  @override
+  String toString() => '[$status] $path';
+}
+
 /// dtk find dart project action runner
 class DtkDartProjectActionRunner
     extends DtkActionRunner<DbDtkActionPubUpgrade> {
   /// Creates a [DtkDartProjectActionRunner] with [db] database and [action].
   DtkDartProjectActionRunner(super.db, {required super.action});
+
+  /// All the dart project paths (relative to the git top) of the current
+  /// timepoint, empty if `findDartProject` has not been run yet.
+  Future<List<String>> getDartProjectPaths() async {
+    var findDartProjectAction = await DtkFindDartProjectActionRunner(
+      db,
+    ).findMainAction(noReport: true);
+    if (findDartProjectAction.status.v != actionResultOk) {
+      return <String>[];
+    }
+    var reposAction = await db.getFindReposAction();
+    var paths = <String>[];
+    for (var repo in reposAction.repos.v!) {
+      var repoAction = await db.getFindDartProjectAction(repo: repo);
+      for (var path in repoAction.dartProjects.v!) {
+        paths.add(join(repo, path));
+      }
+    }
+    return paths;
+  }
+
+  /// Status of each dart project for this action.
+  Future<List<DtkActionProjectStatus>> getProjectStatuses() async {
+    var subActions = await db.findSubActions<DbDtkActionPubUpgrade>(action);
+    var statusMap = <String, String>{
+      for (var subAction in subActions)
+        if (subAction.path.v != null)
+          subAction.path.v!: subAction.status.v ?? actionResultNone,
+    };
+    return (await getDartProjectPaths())
+        .map(
+          (path) => DtkActionProjectStatus(
+            path: path,
+            status: statusMap[path] ?? actionResultNone,
+          ),
+        )
+        .toList();
+  }
+
+  /// Projects not done yet (never run or failed).
+  Future<List<DtkActionProjectStatus>> getRemainingProjects() async {
+    return (await getProjectStatuses())
+        .where((status) => !status.isOk)
+        .toList();
+  }
+
+  /// Write the remaining projects, returns them.
+  Future<List<DtkActionProjectStatus>> writeRemaining() async {
+    var statuses = await getProjectStatuses();
+    if (statuses.isEmpty) {
+      write('no dart project found, run findDartProject first');
+      return <DtkActionProjectStatus>[];
+    }
+    var remaining = statuses.where((status) => !status.isOk).toList();
+    write(
+      '$action: ${statuses.length - remaining.length}/${statuses.length} '
+      'done, ${remaining.length} remaining',
+    );
+    for (var (index, status) in remaining.indexed) {
+      write('${index + 1} $status');
+    }
+    return remaining;
+  }
+
+  /// Force the status of a project to [actionResultOk].
+  Future<void> markProjectDone(String path) async {
+    var projectAction = await db.findOrCreateAction<DbDtkActionPubUpgrade>(
+      action,
+      model: DbDtkActionPubUpgrade()..path.v = path,
+    );
+    projectAction.status.v = actionResultOk;
+    await projectAction.put(db.db);
+    write('marked done $projectAction');
+  }
+
+  /// Mark the main action done when all the projects are done.
+  ///
+  /// Returns true if the main action is done.
+  Future<bool> updateMainActionStatus({bool noReport = false}) async {
+    var statuses = await getProjectStatuses();
+    if (statuses.isEmpty) {
+      if (!noReport) {
+        stdout.writeln('action $action: no dart project found');
+      }
+      return false;
+    }
+    var remaining = statuses.where((status) => !status.isOk).toList();
+    if (remaining.isNotEmpty) {
+      if (!noReport) {
+        stdout.writeln(
+          'action $action: ${remaining.length} project(s) remaining',
+        );
+      }
+      return false;
+    }
+    var mainAction = await findMainAction(noReport: true);
+    if (mainAction.status.v != actionResultOk) {
+      mainAction.status.v = actionResultOk;
+      await mainAction.put(db.db);
+    }
+    if (!noReport) {
+      stdout.writeln('action $action done');
+    }
+    return true;
+  }
 
   @override
   Future<void> run({bool noReport = false}) async {
@@ -77,6 +200,7 @@ class DtkDartProjectActionRunner
     var gitTop = reposAction.gitTop.v!;
     var repos = reposAction.repos.v!;
 
+    var failed = <String>[];
     var futures = <Future>[];
     for (var repo in repos) {
       var findDartProjectAction = await db.getFindDartProjectAction(repo: repo);
@@ -95,22 +219,28 @@ class DtkDartProjectActionRunner
               if (pubUpgradeAction.status.v == actionResultOk) {
                 return;
               }
-              if (action == actionPubUpgrade) {
-                await packageRunCi(
-                  projectPath,
-                  options: PackageRunCiOptions(pubUpgradeOnly: true),
-                );
-              } else if (action == actionAnalyze) {
-                await packageRunCi(
-                  projectPath,
-                  options: PackageRunCiOptions(
-                    analyzeOnly: true,
-                    noPubGet: true,
-                  ),
-                );
+              try {
+                if (action == actionPubUpgrade) {
+                  await packageRunCi(
+                    projectPath,
+                    options: PackageRunCiOptions(pubUpgradeOnly: true),
+                  );
+                } else if (action == actionAnalyze) {
+                  await packageRunCi(
+                    projectPath,
+                    options: PackageRunCiOptions(
+                      analyzeOnly: true,
+                      noPubGet: true,
+                    ),
+                  );
+                }
+                pubUpgradeAction.status.v = actionResultOk;
+              } catch (e) {
+                failed.add(dbRepoPath);
+                pubUpgradeAction.status.v = actionResultKo;
+                stderr.writeln('$action failed on $dbRepoPath: $e');
               }
 
-              pubUpgradeAction.status.v = actionResultOk;
               await pubUpgradeAction.put(db.db);
               stdout.writeln(pubUpgradeAction);
             });
@@ -119,9 +249,17 @@ class DtkDartProjectActionRunner
       }
     }
     await Future.wait(futures);
-    mainAction.status.v = actionResultOk;
-    await mainAction.put(db.db);
-    stdout.writeln('action $action done');
+    if (failed.isNotEmpty) {
+      stdout.writeln('$action failed on ${failed.length} project(s):');
+      for (var path in failed..sort()) {
+        stdout.writeln('  $path');
+      }
+      stdout.writeln(
+        'fix them and run $action again, or validate them in the '
+        '"remaining" menu',
+      );
+    }
+    await updateMainActionStatus();
   }
 }
 
@@ -259,6 +397,54 @@ void dtkGitMenu() {
     item('pubUpgrade && analyze', () async {
       await DtkDartProjectActionRunner(db, action: actionPubUpgrade).run();
       await DtkDartProjectActionRunner(db, action: actionAnalyze).run();
+    });
+    menu('remaining', () {
+      for (var projectAction in [actionPubUpgrade, actionAnalyze]) {
+        item('list remaining $projectAction', () async {
+          await DtkDartProjectActionRunner(
+            db,
+            action: projectAction,
+          ).writeRemaining();
+        });
+        item('mark done $projectAction (prompt)', () async {
+          var runner = DtkDartProjectActionRunner(db, action: projectAction);
+          var remaining = await runner.writeRemaining();
+          if (remaining.isEmpty) {
+            return;
+          }
+          var answer = (await prompt(
+            'mark done (index list, "ko" for all failed, "all", '
+            'empty to cancel)',
+          )).trim();
+          var selection = <DtkActionProjectStatus>[];
+          if (answer.nonEmpty() == null) {
+            return;
+          } else if (answer == 'all') {
+            selection = remaining;
+          } else if (answer == actionResultKo) {
+            selection = remaining
+                .where((status) => status.status == actionResultKo)
+                .toList();
+          } else {
+            for (var part in answer.split(',')) {
+              var index = parseInt(part.trim());
+              if (index == null || index < 1 || index > remaining.length) {
+                write('invalid index $part');
+                return;
+              }
+              selection.add(remaining[index - 1]);
+            }
+          }
+          if (selection.isEmpty) {
+            write('nothing selected');
+            return;
+          }
+          for (var status in selection) {
+            await runner.markProjectDone(status.path);
+          }
+          await runner.updateMainActionStatus();
+        });
+      }
     });
     menu('clear', () async {
       item('clear actions', () async {

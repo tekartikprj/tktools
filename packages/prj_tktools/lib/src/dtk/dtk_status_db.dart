@@ -158,6 +158,7 @@ class DtkStatusDb {
         case actionFindDartProjects:
           return DbDtkActionFindDartProject();
         case actionPubUpgrade:
+        case actionAnalyze:
           return DbDtkActionPubUpgrade();
         default:
           return DbDtkAction();
@@ -323,6 +324,19 @@ class DtkStatusDb {
     return await db.transaction((txn) async {
       var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
       return await _findActions(txn, timepointId, action);
+    });
+  }
+
+  /// Find the sub actions (i.e. one per dart project) of a main action.
+  Future<List<T>> findSubActions<T extends DbDtkAction>(String action) async {
+    return await db.transaction((txn) async {
+      var timepointId = (await _getOrCreateLastTimepoint(txn)).id;
+      return await _findActions<T>(
+        txn,
+        timepointId,
+        action,
+        filter: Filter.equals(dbDtkActionModel.main.name, false),
+      );
     });
   }
 
