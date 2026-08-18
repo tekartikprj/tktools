@@ -107,6 +107,28 @@ String _githubRelPath(String gitUrl) {
   return path;
 }
 
+/// Write [content] to [file] only if it differs from the existing content.
+///
+/// Reports what happened on stdout (`Created`, `Updated` or `No changes
+/// needed for`).
+void localWorkspaceWriteFileIfChanged(File file, String content) {
+  if (file.existsSync()) {
+    String? existing;
+    try {
+      existing = file.readAsStringSync();
+    } catch (_) {}
+    if (existing == content) {
+      stdout.writeln('No changes needed for ${file.path}');
+      return;
+    }
+    file.writeAsStringSync(content);
+    stdout.writeln('Updated ${file.path}');
+    return;
+  }
+  file.writeAsStringSync(content);
+  stdout.writeln('Created ${file.path}');
+}
+
 /// Create (replacing any existing) a symlink at [absoluteLinkPath] pointing to
 /// [localTarget].
 void localWorkspaceCreateSymlink(String absoluteLinkPath, String localTarget) {
@@ -368,7 +390,8 @@ class LocalWorkspaceHelper {
         var localTarget = normalize(absolute(join(githubTop, repoRelPath)));
         if (!Directory(localTarget).existsSync()) {
           stderr.writeln('Warning: git target $localTarget does not exist');
-          throw StateError('Git target $localTarget does not exist');
+          // throw StateError('Git target $localTarget does not exist locally');
+          continue;
         }
         var resolved = relative(localTarget, from: absolute(path));
         resolvedList.add(
@@ -413,15 +436,19 @@ class LocalWorkspaceHelper {
     localDir.createSync(recursive: true);
 
     var encoder = const JsonEncoder.withIndent('  ');
-    resolvedFile.writeAsStringSync('${encoder.convert(resolved.toMap())}\n');
-    stdout.writeln('Created ${resolvedFile.path}');
+    localWorkspaceWriteFileIfChanged(
+      resolvedFile,
+      '${encoder.convert(resolved.toMap())}\n',
+    );
 
     var inputMap = {
       'version': dtkResolvedLocalWorkspaceVersion,
       'input': resolved.input.v?.toMap() ?? {},
     };
-    resolvedInputFile.writeAsStringSync('${encoder.convert(inputMap)}\n');
-    stdout.writeln('Created ${resolvedInputFile.path}');
+    localWorkspaceWriteFileIfChanged(
+      resolvedInputFile,
+      '${encoder.convert(inputMap)}\n',
+    );
 
     _cachedResolvedLocalWorkspace = resolved;
     _cachedResolvedFolders = null;
@@ -563,8 +590,10 @@ class LocalWorkspaceHelper {
     };
 
     var encoder = const JsonEncoder.withIndent('  ');
-    workspaceFile.writeAsStringSync('${encoder.convert(content)}\n');
-    stdout.writeln('Created ${workspaceFile.path}');
+    localWorkspaceWriteFileIfChanged(
+      workspaceFile,
+      '${encoder.convert(content)}\n',
+    );
   }
 
   /// Write IntelliJ project files (`.idea/modules.xml` and `.idea/<dir_name>.iml`)
@@ -604,7 +633,6 @@ class LocalWorkspaceHelper {
   </component>
 </project>
 ''';
-    modulesFile.writeAsStringSync(modulesContent);
 
     // Filter absoluteFolders to only keep content roots (which are not subfolders of other content roots)
     var contentRoots = <String>[];
@@ -668,9 +696,8 @@ ${contentEntries.toString().trimRight()}
   </component>
 </module>
 ''';
-    imlFile.writeAsStringSync(imlContent);
-    stdout.writeln('Created ${imlFile.path}');
-    stdout.writeln('Created ${modulesFile.path}');
+    localWorkspaceWriteFileIfChanged(imlFile, imlContent);
+    localWorkspaceWriteFileIfChanged(modulesFile, modulesContent);
   }
 
   /// Update `.claude/settings.json` with the resolved folders added to
