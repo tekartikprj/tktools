@@ -17,6 +17,7 @@ const localWorkspaceConfigFileName = 'local_workspace.json';
 /// - [links]: list of relative paths; each creates ./projects/basename -> absolute target
 /// - [addGit]: list of package names to symlink at repo level via tkpub
 /// - [add]: list of package names to symlink at package path level via tkpub
+/// - [addDir]: list of relative or absolute folder paths, added as is (no symlink)
 class DtkLocalWorkspace extends CvModelBase {
   /// Relative paths; each creates ./projects/basename -> absolute target.
   final links = CvListField<String>('links');
@@ -27,8 +28,12 @@ class DtkLocalWorkspace extends CvModelBase {
   /// Package names to symlink at package path level via tkpub.
   final add = CvListField<String>('add');
 
+  /// Existing folders (relative to the workspace or absolute) added to the
+  /// workspace as is, no symlink is created and no tkpub lookup is needed.
+  final addDir = CvListField<String>('add-dir');
+
   @override
-  CvFields get fields => [links, addGit, add];
+  CvFields get fields => [links, addGit, add, addDir];
 }
 
 /// A single resolved entry in a [DtkResolvedLocalWorkspace].
@@ -263,7 +268,12 @@ class LocalWorkspaceHelper {
 
     Map<String, dynamic> inputMap;
     try {
-      inputMap = (jsonDecode(configFile.readAsStringSync()) as Map)
+      // Compare through the model so that unknown fields are ignored on both
+      // sides (the stored input is a model map too).
+      inputMap = configFile
+          .readAsStringSync()
+          .cv<DtkLocalWorkspace>()
+          .toMap()
           .cast<String, dynamic>();
     } catch (_) {
       return false;
@@ -361,6 +371,22 @@ class LocalWorkspaceHelper {
         DtkResolvedLocalWorkspaceResolved()
           ..type.v = 'links'
           ..source.v = relTarget
+          ..path.v = resolved,
+      );
+    }
+
+    for (var dirTarget in config.addDir.v ?? <String>[]) {
+      // join() handles both relative (to the workspace) and absolute paths.
+      var absoluteTarget = normalize(absolute(join(path, dirTarget)));
+      if (!Directory(absoluteTarget).existsSync()) {
+        stderr.writeln('Warning: dir target $absoluteTarget does not exist');
+        continue;
+      }
+      var resolved = relative(absoluteTarget, from: absolute(path));
+      resolvedList.add(
+        DtkResolvedLocalWorkspaceResolved()
+          ..type.v = 'add-dir'
+          ..source.v = dirTarget
           ..path.v = resolved,
       );
     }
@@ -506,6 +532,15 @@ class LocalWorkspaceHelper {
     } else {
       for (var relTarget in config.links.v ?? <String>[]) {
         var absoluteTarget = normalize(absolute(join(path, relTarget)));
+        folders.add(relative(absoluteTarget, from: absolute(path)));
+      }
+
+      for (var dirTarget in config.addDir.v ?? <String>[]) {
+        var absoluteTarget = normalize(absolute(join(path, dirTarget)));
+        if (!Directory(absoluteTarget).existsSync()) {
+          stderr.writeln('Warning: dir target $absoluteTarget does not exist');
+          continue;
+        }
         folders.add(relative(absoluteTarget, from: absolute(path)));
       }
 
