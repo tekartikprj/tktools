@@ -26,6 +26,11 @@ dependencies:
     git:
       url: https://github.com/tekartik/app_common_utils.dart
       path: app_cv_sembast
+  # Local dart project cache (sdb)
+  tekartik_app_cv_sdb:
+    git:
+      url: https://github.com/tekartik/app_common_utils.dart
+      path: app_cv_sdb
   tekartik_common_utils:
     git:
       url: https://github.com/tekartik/common_utils.dart
