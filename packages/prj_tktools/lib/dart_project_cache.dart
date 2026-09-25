@@ -7,11 +7,19 @@ export 'src/dart_project_cache/dart_project.dart'
         DartProjectKindExt,
         DartProjectInfo,
         DartProjectFolderInfo,
+        DartProjectGitFolderInfo,
         dartProjectCanonicalPath,
         dartProjectKindFromName,
         dartProjectKindOf;
 export 'src/dart_project_cache/dart_project_cache.dart'
     show DartProjectCache, DartProjectCacheRefresh;
+export 'src/dart_project_cache/dart_project_git.dart'
+    show
+        dartProjectGitWebUri,
+        gitConfigRemoteUrl,
+        gitWebHosts,
+        gitWebSiteName,
+        gitWebUri;
 export 'src/dart_project_cache/dart_project_scan_task.dart'
     show DartProjectScanTask, startDartProjectScan;
 export 'src/dart_project_cache/dart_project_scanner.dart'

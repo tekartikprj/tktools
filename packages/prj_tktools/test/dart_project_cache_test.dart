@@ -34,6 +34,33 @@ Future<void> writeProject(
       );
 }
 
+/// A git repository at [path], its `origin` remote being [remote].
+Future<void> writeGit(FileSystem fs, String path, {String? remote}) async {
+  var dir = fs.directory(fs.path.join('/', path, '.git'));
+  await dir.create(recursive: true);
+  await fs
+      .file(fs.path.join(dir.path, 'config'))
+      .writeAsString(
+        [
+          '[core]',
+          '\tbare = false',
+          if (remote != null) ...['[remote "origin"]', '\turl = $remote'],
+        ].join('\n'),
+      );
+}
+
+/// A local workspace at [path].
+Future<void> writeLocalWorkspace(FileSystem fs, String path) async {
+  var dir = fs.directory(fs.path.join('/', path));
+  await dir.create(recursive: true);
+  await fs
+      .file(fs.path.join(dir.path, 'local_workspace.json'))
+      .writeAsString('{"add-git": ["tekartik/sqflite"]}');
+}
+
+List<String> gitPaths(Iterable<DartProjectGitFolderInfo> folders) =>
+    folders.map((folder) => folder.path).toList();
+
 List<String> paths(Iterable<DartProjectInfo> projects) =>
     projects.map((project) => project.path).toList();
 
@@ -150,6 +177,59 @@ void main() {
       ).scan();
       expect(progress, [1]);
       expect(result.projects, hasLength(2));
+    });
+
+    test('local workspaces and git repositories', () async {
+      await writeGit(
+        fs,
+        'git/github.com/tekartik/sqflite',
+        remote: 'git@github.com:tekartik/sqflite.git',
+      );
+      await writeProject(fs, 'git/github.com/tekartik/sqflite/sqflite');
+      await writeGit(fs, 'git/github.com/alextekartik/workspaces.dart');
+      await writeLocalWorkspace(
+        fs,
+        'git/github.com/alextekartik/workspaces.dart/projects/tekaly_buzz',
+      );
+      // A local workspace wins over a dart project.
+      await writeLocalWorkspace(fs, 'git/both');
+      await writeProject(fs, 'git/both');
+      // A worktree: its `.git` file points to the main repository.
+      await fs.directory('/git/worktree').create(recursive: true);
+      await fs
+          .file('/git/worktree/.git')
+          .writeAsString(
+            'gitdir: /git/github.com/tekartik/sqflite/.git/worktrees/wt\n',
+          );
+      await fs
+          .directory('/git/github.com/tekartik/sqflite/.git/worktrees/wt')
+          .create(recursive: true);
+      await fs
+          .file('/git/github.com/tekartik/sqflite/.git/worktrees/wt/commondir')
+          .writeAsString('../..\n');
+
+      var result = await DartProjectScanner(fs, '/git').scan();
+      expect(paths(result.projects), [
+        '/git/both',
+        '/git/github.com/alextekartik/workspaces.dart/projects/tekaly_buzz',
+        '/git/github.com/tekartik/sqflite/sqflite',
+      ]);
+      expect(result.projects.map((project) => project.kind), [
+        DartProjectKind.localWorkspace,
+        DartProjectKind.localWorkspace,
+        DartProjectKind.dart,
+      ]);
+      expect(result.projects[1].name, 'tekaly_buzz');
+      expect(gitPaths(result.gitFolders), [
+        '/git/github.com/alextekartik/workspaces.dart',
+        '/git/github.com/tekartik/sqflite',
+        '/git/worktree',
+      ]);
+      expect(result.gitFolders.map((git) => git.remote), [
+        null,
+        'git@github.com:tekartik/sqflite.git',
+        'git@github.com:tekartik/sqflite.git',
+      ]);
     });
 
     test('a missing folder is reported', () async {
@@ -311,6 +391,57 @@ void main() {
       ]);
     });
 
+    test('the git repositories are cached', () async {
+      await writeGit(fs, 'git/one', remote: 'https://github.com/o/one.git');
+      await writeGit(fs, 'git/one/sub/nested');
+      await writeGit(fs, 'git/two');
+      await cache.refresh('/git').done;
+      expect(gitPaths(await cache.getGitFolders()), [
+        '/git/one',
+        '/git/one/sub/nested',
+        '/git/two',
+      ]);
+      expect(gitPaths(await cache.getGitFolders('/git/one')), [
+        '/git/one',
+        '/git/one/sub/nested',
+      ]);
+      // The repository holding a folder.
+      var git = (await cache.getGitFolder('/git/one/sub/lib'))!;
+      expect(git.path, '/git/one');
+      expect(git.remote, 'https://github.com/o/one.git');
+      expect((await cache.getGitFolder('/git/one/sub/nested'))!.remote, isNull);
+      expect(await cache.getGitFolder('/git'), isNull);
+
+      // Replaced by a refresh.
+      await fs.directory('/git/one/sub').delete(recursive: true);
+      await cache.refresh('/git/one').done;
+      expect(gitPaths(await cache.getGitFolders()), ['/git/one', '/git/two']);
+      await cache.delete('/git/two');
+      expect(gitPaths(await cache.getGitFolders()), ['/git/one']);
+    });
+
+    test('a version 1 cache is scanned again', () async {
+      var factory = newSdbFactoryMemory();
+      var legacyProjectStore = SdbStoreRef<String, SdbModel>('project');
+      var legacyFolderStore = SdbStoreRef<String, SdbModel>('folder');
+      var database = await factory.openDatabase(
+        DartProjectCache.defaultDbName,
+        options: SdbOpenDatabaseOptions(
+          version: 1,
+          schema: SdbDatabaseSchema(
+            stores: [legacyProjectStore.schema(), legacyFolderStore.schema()],
+          ),
+        ),
+      );
+      await legacyFolderStore.record('/git').put(database, {'refreshed': 1});
+      await database.close();
+
+      var upgraded = await DartProjectCache.open(factory, fs: fs);
+      addTearDown(upgraded.close);
+      expect(upgraded.database.storeNames, isNot(contains('folder')));
+      expect(await upgraded.getIndexedFolder('/git'), isNull);
+    });
+
     test('several top folders', () async {
       await writeProject(fs, 'git/one');
       await writeProject(fs, 'other/two');
@@ -433,6 +564,91 @@ void main() {
         '/git/github.com/tekartik/sqflite/sqflite',
         '/git/github.com/tekartik/sqflite/sqflite_common',
       ]);
+    });
+  });
+
+  group('git web', () {
+    test('remote url of a git config', () {
+      expect(
+        gitConfigRemoteUrl(
+          '[remote "upstream"]\n\turl = https://github.com/u/r\n'
+          '[remote "origin"]\n\turl = git@github.com:o/r.git\n',
+        ),
+        'git@github.com:o/r.git',
+      );
+      expect(
+        gitConfigRemoteUrl('[remote "upstream"]\n  url = https://x/u/r\n'),
+        'https://x/u/r',
+      );
+      expect(gitConfigRemoteUrl('[core]\n\turl = nope\n'), isNull);
+    });
+
+    test('web page of a remote', () {
+      for (var remote in [
+        'https://github.com/tekartik/sqflite.git',
+        'https://github.com/tekartik/sqflite',
+        'git@github.com:tekartik/sqflite.git',
+        'ssh://git@github.com/tekartik/sqflite.git',
+      ]) {
+        expect(
+          gitWebUri(remote).toString(),
+          'https://github.com/tekartik/sqflite',
+          reason: remote,
+        );
+      }
+      expect(
+        gitWebUri(
+          'git@github.com:tekartik/sqflite.git',
+          subPath: 'sqflite/lib',
+        ).toString(),
+        'https://github.com/tekartik/sqflite/tree/HEAD/sqflite/lib',
+      );
+      expect(
+        gitWebUri(
+          'git@gitlab.com:alexrx/exp.flutter.git',
+          subPath: 'a',
+        ).toString(),
+        'https://gitlab.com/alexrx/exp.flutter/-/tree/HEAD/a',
+      );
+      expect(
+        gitWebUri('git@bitbucket.org:tekartik/x.git', subPath: 'a').toString(),
+        'https://bitbucket.org/tekartik/x/src/HEAD/a',
+      );
+      // An ssh host alias.
+      expect(
+        gitWebUri('git@github.com-hublot:hublot/scan').toString(),
+        'https://github.com/hublot/scan',
+      );
+      expect(gitWebUri('git@myhost.com:o/r.git'), isNull);
+      expect(gitWebUri('/local/path/repo'), isNull);
+      expect(gitWebSiteName(gitWebUri('git@github.com:o/r')!), 'GitHub');
+    });
+
+    test('web page of a folder of a repository', () {
+      var git = DartProjectGitFolderInfo(
+        path: '/git/sqflite',
+        remote: 'git@github.com:tekartik/sqflite.git',
+        refreshed: DateTime(2026),
+      );
+      expect(
+        dartProjectGitWebUri(git, '/git/sqflite').toString(),
+        'https://github.com/tekartik/sqflite',
+      );
+      expect(
+        dartProjectGitWebUri(git, '/git/sqflite/packages/app').toString(),
+        'https://github.com/tekartik/sqflite/tree/HEAD/packages/app',
+      );
+      expect(
+        dartProjectGitWebUri(
+          DartProjectGitFolderInfo(
+            path: '/git/x',
+            remote: null,
+            refreshed: DateTime(2026),
+          ),
+          '/git/x',
+        ),
+        isNull,
+      );
     });
   });
 }

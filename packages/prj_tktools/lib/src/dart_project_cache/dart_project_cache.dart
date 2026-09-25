@@ -197,6 +197,45 @@ class DartProjectCache {
     );
   }
 
+  /// The git repositories of the folder [path] (itself included), sorted by
+  /// path, every repository of the cache when null.
+  Future<List<DartProjectGitFolderInfo>> getGitFolders([String? path]) async {
+    if (path == null) {
+      var records = await dartProjectGitStore.findRecords(database);
+      return records.map((record) => record.toInfo()).toList();
+    }
+    var folder = canonicalPath(path);
+    return await dartProjectGitStore.inTransaction(
+      database,
+      SdbTransactionMode.readOnly,
+      (txn) async {
+        var self = await dartProjectGitStore.record(folder).get(txn);
+        var below = await dartProjectGitStore.findRecords(
+          txn,
+          boundaries: _withinBoundaries(folder),
+        );
+        return [?self?.toInfo(), for (var record in below) record.toInfo()];
+      },
+    );
+  }
+
+  /// The git repository holding [path] (or [path] itself), null when none is
+  /// in the cache.
+  Future<DartProjectGitFolderInfo?> getGitFolder(String path) async {
+    var folder = canonicalPath(path);
+    while (true) {
+      var record = await dartProjectGitStore.record(folder).get(database);
+      if (record != null) {
+        return record.toInfo();
+      }
+      var parent = fs.path.dirname(folder);
+      if (parent == folder) {
+        return null;
+      }
+      folder = parent;
+    }
+  }
+
   /// The projects matching [query], the closest to [from] first, see
   /// [searchDartProjects].
   Future<List<DartProjectInfo>> search(
@@ -276,28 +315,30 @@ class DartProjectCache {
   Future<void> save(DartProjectScanResult result) async {
     var folder = result.path;
     var within = _withinBoundaries(folder);
-    await database.inStoresTransaction(
-      [dartProjectStore.rawRef, dartProjectFolderStore.rawRef],
-      SdbTransactionMode.readWrite,
-      (txn) async {
-        await dartProjectStore.record(folder).delete(txn);
-        await dartProjectStore.delete(txn, boundaries: within);
-        for (var project in result.projects) {
-          await dartProjectStore
-              .record(project.path)
-              .put(txn, dbDartProjectFrom(project));
-        }
-        // The folders scanned before below this one are replaced by it.
-        await dartProjectFolderStore.delete(txn, boundaries: within);
-        await dartProjectFolderStore
-            .record(folder)
-            .put(
-              txn,
-              DbDartProjectFolder()
-                ..refreshed.v = result.refreshed.millisecondsSinceEpoch,
-            );
-      },
-    );
+    await database.inStoresTransaction(_stores, SdbTransactionMode.readWrite, (
+      txn,
+    ) async {
+      await _deleteWithin(txn, folder, within);
+      for (var project in result.projects) {
+        await dartProjectStore
+            .record(project.path)
+            .put(txn, dbDartProjectFrom(project));
+      }
+      for (var git in result.gitFolders) {
+        await dartProjectGitStore
+            .record(git.path)
+            .put(txn, dbDartProjectGitFrom(git));
+      }
+      // The folders scanned before below this one are replaced by it.
+      await dartProjectFolderStore.delete(txn, boundaries: within);
+      await dartProjectFolderStore
+          .record(folder)
+          .put(
+            txn,
+            DbDartProjectFolder()
+              ..refreshed.v = result.refreshed.millisecondsSinceEpoch,
+          );
+    });
     _changeController.add(folder);
   }
 
@@ -308,16 +349,13 @@ class DartProjectCache {
   Future<void> delete(String path) async {
     var folder = canonicalPath(path);
     var within = _withinBoundaries(folder);
-    await database.inStoresTransaction(
-      [dartProjectStore.rawRef, dartProjectFolderStore.rawRef],
-      SdbTransactionMode.readWrite,
-      (txn) async {
-        await dartProjectStore.record(folder).delete(txn);
-        await dartProjectStore.delete(txn, boundaries: within);
-        await dartProjectFolderStore.record(folder).delete(txn);
-        await dartProjectFolderStore.delete(txn, boundaries: within);
-      },
-    );
+    await database.inStoresTransaction(_stores, SdbTransactionMode.readWrite, (
+      txn,
+    ) async {
+      await _deleteWithin(txn, folder, within);
+      await dartProjectFolderStore.record(folder).delete(txn);
+      await dartProjectFolderStore.delete(txn, boundaries: within);
+    });
     _changeController.add(folder);
   }
 
@@ -331,6 +369,26 @@ class DartProjectCache {
     await _refreshController.close();
     await _changeController.close();
     await database.close();
+  }
+
+  /// The stores written by a save.
+  List<SdbStoreRef> get _stores => [
+    dartProjectStore.rawRef,
+    dartProjectGitStore.rawRef,
+    dartProjectFolderStore.rawRef,
+  ];
+
+  /// Delete the projects and the git repositories of [folder] (itself
+  /// included).
+  Future<void> _deleteWithin(
+    SdbClient txn,
+    String folder,
+    SdbBoundaries<String> within,
+  ) async {
+    await dartProjectStore.record(folder).delete(txn);
+    await dartProjectStore.delete(txn, boundaries: within);
+    await dartProjectGitStore.record(folder).delete(txn);
+    await dartProjectGitStore.delete(txn, boundaries: within);
   }
 
   SdbBoundaries<String> _withinBoundaries(String folder) =>

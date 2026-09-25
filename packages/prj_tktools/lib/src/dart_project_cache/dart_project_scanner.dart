@@ -10,8 +10,11 @@ import 'package:process_run/shell.dart' show dartVersion;
 import 'package:yaml/yaml.dart';
 
 import 'dart_project.dart';
+import 'dart_project_git.dart';
 
 const _pubspecYaml = 'pubspec.yaml';
+const _localWorkspaceJson = 'local_workspace.json';
+const _dotGit = '.git';
 
 /// Folders never scanned, like `iteratePubPath` of `dev_build` (the hidden
 /// ones too).
@@ -26,8 +29,12 @@ class DartProjectScanResult {
   /// Canonical path of the folder scanned.
   final String path;
 
-  /// The projects found, sorted by path once the scan is done.
+  /// The projects (and local workspaces) found, sorted by path once the scan
+  /// is done.
   final List<DartProjectInfo> projects;
+
+  /// The git repositories found, sorted by path once the scan is done.
+  final List<DartProjectGitFolderInfo> gitFolders;
 
   /// The folders that could not be read, empty when all good.
   final List<String> errors;
@@ -45,6 +52,7 @@ class DartProjectScanResult {
     required this.projects,
     required this.errors,
     required this.refreshed,
+    this.gitFolders = const [],
     this.cancelled = false,
   });
 
@@ -53,6 +61,7 @@ class DartProjectScanResult {
       DartProjectScanResult(
         path: path,
         projects: projects,
+        gitFolders: gitFolders,
         errors: [...this.errors, ...errors],
         refreshed: refreshed,
         cancelled: cancelled,
@@ -71,6 +80,9 @@ class DartProjectScanResult {
 /// dart sdk, like `iteratePubPath` of `dev_build`: the hidden folders,
 /// `build`, `deploy`, `node_modules` and the `test` folder of a project are
 /// not scanned. The links are not followed.
+///
+/// A folder holding a `local_workspace.json` file is a local workspace, a
+/// folder with a `.git` entry is a git repository (its remote is read).
 ///
 /// A pub workspace root is a flutter workspace when one of its packages
 /// (`resolution: workspace`) found below it is a flutter one.
@@ -117,18 +129,22 @@ class DartProjectScanner {
     );
     var pathContext = fs.path;
     var projects = <String, DartProjectInfo>{};
+    var gitFolders = <DartProjectGitFolderInfo>[];
     var errors = <String>[];
 
     DartProjectScanResult found({bool sorted = false}) {
       var list = projects.values.toList();
+      var gitList = List.of(gitFolders);
       if (sorted) {
         list.sort(
           (project1, project2) => project1.path.compareTo(project2.path),
         );
+        gitList.sort((git1, git2) => git1.path.compareTo(git2.path));
       }
       return DartProjectScanResult(
         path: path,
         projects: list,
+        gitFolders: gitList,
         errors: List.of(errors),
         refreshed: refreshed,
         cancelled: _cancelled,
@@ -166,11 +182,31 @@ class DartProjectScanner {
         errors.add('$folder: $e');
         continue;
       }
-      var hasPubspec = entities.any(
+      bool has(String name, {bool file = true}) => entities.any(
         (entity) =>
-            entity is File && pathContext.basename(entity.path) == _pubspecYaml,
+            (!file || entity is File) &&
+            pathContext.basename(entity.path) == name,
       );
-      if (hasPubspec) {
+      var hasPubspec = has(_pubspecYaml);
+      if (has(_dotGit, file: false)) {
+        gitFolders.add(
+          DartProjectGitFolderInfo(
+            path: folder,
+            remote: await _readGitRemote(folder),
+            refreshed: refreshed,
+          ),
+        );
+      }
+      if (has(_localWorkspaceJson)) {
+        // A local workspace wins over a dart project.
+        projects[folder] = DartProjectInfo(
+          path: folder,
+          name: pathContext.basename(folder),
+          kind: DartProjectKind.localWorkspace,
+          refreshed: refreshed,
+        );
+        _progress(found);
+      } else if (hasPubspec) {
         var project = await _readProject(folder, refreshed: refreshed);
         if (project != null) {
           projects[folder] = project.info;
@@ -198,6 +234,42 @@ class DartProjectScanner {
       pending.addAll(subFolders);
     }
     return found(sorted: true);
+  }
+
+  /// The remote url of the git repository [folder], null when none.
+  ///
+  /// A `.git` file (a worktree, a sub module) points to the git folder,
+  /// which points to the main one (`commondir`) for a worktree.
+  Future<String?> _readGitRemote(String folder) async {
+    var pathContext = fs.path;
+    Future<String?> read(String path) async {
+      try {
+        return await fs.file(path).readAsString();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    var dotGit = pathContext.join(folder, _dotGit);
+    var config = await read(pathContext.join(dotGit, 'config'));
+    if (config == null) {
+      var gitdir = RegExp(
+        r'^gitdir:\s*(.+)$',
+        multiLine: true,
+      ).firstMatch(await read(dotGit) ?? '')?.group(1)?.trim();
+      if (gitdir == null) {
+        return null;
+      }
+      gitdir = pathContext.normalize(pathContext.join(folder, gitdir));
+      var commondir = (await read(
+        pathContext.join(gitdir, 'commondir'),
+      ))?.trim();
+      if (commondir != null && commondir.isNotEmpty) {
+        gitdir = pathContext.normalize(pathContext.join(gitdir, commondir));
+      }
+      config = await read(pathContext.join(gitdir, 'config'));
+    }
+    return config == null ? null : gitConfigRemoteUrl(config);
   }
 
   /// Report what was [found] so far, unless it was reported less than

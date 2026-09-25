@@ -1,7 +1,7 @@
 import 'package:fs_shim/fs_shim.dart';
 
-/// What a dart project is, it drives whether `dart` or `flutter` runs its
-/// commands.
+/// What a folder of the cache is: a dart project (the kind drives whether
+/// `dart` or `flutter` runs its commands) or a local workspace.
 enum DartProjectKind {
   /// A dart package.
   dart,
@@ -15,10 +15,22 @@ enum DartProjectKind {
   /// A pub workspace root holding at least one flutter package, `flutter`
   /// runs its commands.
   flutterWorkspace,
+
+  /// A local workspace: a folder with a `local_workspace.json` file, linking
+  /// projects of several repositories. Not a dart project itself (it wins
+  /// over a `pubspec.yaml` in the same folder).
+  localWorkspace,
 }
 
 /// Helpers on [DartProjectKind].
 extension DartProjectKindExt on DartProjectKind {
+  /// True for a dart project (a `pubspec.yaml`), false for a local
+  /// workspace.
+  bool get isDart => this != DartProjectKind.localWorkspace;
+
+  /// True for a local workspace.
+  bool get isLocalWorkspace => this == DartProjectKind.localWorkspace;
+
   /// True when `flutter` (and not `dart`) runs the commands of the project.
   bool get isFlutter =>
       this == DartProjectKind.flutter ||
@@ -35,6 +47,7 @@ extension DartProjectKindExt on DartProjectKind {
     DartProjectKind.flutter => 'flutter',
     DartProjectKind.dartWorkspace => 'dart workspace',
     DartProjectKind.flutterWorkspace => 'flutter workspace',
+    DartProjectKind.localWorkspace => 'local workspace',
   };
 }
 
@@ -65,12 +78,13 @@ DartProjectKind dartProjectKindOf({
 String dartProjectCanonicalPath(FileSystem fs, String path) =>
     fs.path.canonicalize(fs.path.absolute(path));
 
-/// A dart project of the cache.
+/// A dart project (or a local workspace) of the cache.
 class DartProjectInfo {
   /// Canonical absolute path of the project folder, the key of the cache.
   final String path;
 
-  /// Package name, the folder name when the `pubspec.yaml` has none.
+  /// Package name, the folder name when the `pubspec.yaml` has none (or for
+  /// a local workspace).
   final String name;
 
   /// What the project is.
@@ -115,4 +129,27 @@ class DartProjectFolderInfo {
 
   @override
   String toString() => '$path ($refreshed)';
+}
+
+/// A git repository of the cache: a folder with a `.git` entry.
+class DartProjectGitFolderInfo {
+  /// Canonical absolute path of the repository (its top folder).
+  final String path;
+
+  /// The url of its `origin` remote (the first one when none is named
+  /// `origin`), null when it has none (or it could not be read).
+  final String? remote;
+
+  /// When the folder was read from the disk.
+  final DateTime refreshed;
+
+  /// Creates a git folder.
+  const DartProjectGitFolderInfo({
+    required this.path,
+    required this.remote,
+    required this.refreshed,
+  });
+
+  @override
+  String toString() => '$path (git ${remote ?? 'no remote'})';
 }
