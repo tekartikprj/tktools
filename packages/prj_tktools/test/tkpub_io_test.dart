@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:dev_build/build_support.dart';
 import 'package:path/path.dart';
 import 'package:process_run/shell.dart';
+import 'package:tekartik_prj_tktools/tkpub.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -70,6 +71,15 @@ void main() {
     );
     var package = (await shell.run('tkpub config get demo')).outText.trim();
     expect(package, 'demo url@git gitpath');
+  });
+  test('tkPubGetPackageConfigMap without pub get', () async {
+    await File(join(projectPath, 'pubspec.yaml')).writeAsString('''
+name: tkpub_test_project
+environment:
+  sdk: ^3.0.0
+''');
+    var packageConfigMap = await tkPubGetPackageConfigMap(projectPath);
+    expect(packageConfigGetPackages(packageConfigMap), ['tkpub_test_project']);
   });
   test('tkpub add', () async {
     var prjShell = shell.cd(projectPath);
