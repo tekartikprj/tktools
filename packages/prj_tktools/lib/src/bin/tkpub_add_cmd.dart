@@ -139,19 +139,18 @@ abstract class TkPubAddRemoveCommand extends TkPubSubCommand {
     var globalOverrides = !isClear ? results.flag(flagOverridesKey) : false;
     var globalPubspecOverrides = results.flag(flagPubspecOverridesKey);
     var recursive = results.flag(flagRecursiveKey);
+    // Only add declares these flags.
     var force = isAdd ? results.flag(flagForceKey) : false;
-    var readConfig = results.flag(flagReadConfigKey);
-    var directAndPubspecOverrides = results.flag(
-      flagDirectAndPubspecOverridesKey,
-    );
-    var globalDirect = results.flag(flagDirectKey);
+    var readConfig = isAdd ? results.flag(flagReadConfigKey) : false;
+    var directAndPubspecOverrides = isAdd
+        ? results.flag(flagDirectAndPubspecOverridesKey)
+        : false;
+    var globalDirect = isAdd ? results.flag(flagDirectKey) : false;
 
-    if (globalOverrides) {
-      if (globalOverrides || globalOverrides) {
-        throw ArgumentError(
-          'Cannot use --$flagPubspecOverridesKey with --$flagDevKey or --$flagOverridesKey',
-        );
-      }
+    if (globalPubspecOverrides && (globalDev || globalOverrides)) {
+      throw ArgumentError(
+        'Cannot use --$flagPubspecOverridesKey with --$flagDevKey or --$flagOverridesKey',
+      );
     }
 
     var rest = results.rest;

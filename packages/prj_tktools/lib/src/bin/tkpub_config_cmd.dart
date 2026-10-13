@@ -71,9 +71,6 @@ class _SetCommand extends _TkPubConfigSubCommand {
     var gitUrl = results[optionGitUrl] as String?;
     var gitPath = results[optionGitPath] as String?;
     var gitRef = results[optionGitRef] as String?;
-    if (gitUrl == null) {
-      throw ArgumentError('git-url is required');
-    }
     var rest = results.rest;
     if (rest.length != 1) {
       throw ArgumentError('One argument expected (package name)');
@@ -81,10 +78,23 @@ class _SetCommand extends _TkPubConfigSubCommand {
 
     var packageName = rest.first;
     await tkPubConfigCommand.dbAction((db) async {
-      var package = tkPubPackagesStore.record(packageName).cv()
-        ..gitUrl.v = gitUrl
-        ..gitPath.setValue(gitPath)
-        ..gitRef.setValue(gitRef);
+      // Only the given options change, the other fields (published...) stay.
+      var package = await db.getPackageOrNull(packageName);
+      if (package == null) {
+        if (gitUrl == null) {
+          throw ArgumentError('git-url is required');
+        }
+        package = tkPubPackagesStore.record(packageName).cv();
+      }
+      if (gitUrl != null) {
+        package.gitUrl.v = gitUrl;
+      }
+      if (gitPath != null) {
+        package.gitPath.v = gitPath;
+      }
+      if (gitRef != null) {
+        package.gitRef.v = gitRef;
+      }
       await db.setPackage(package.id, package);
       writePackageConfig(package);
     }, write: true);

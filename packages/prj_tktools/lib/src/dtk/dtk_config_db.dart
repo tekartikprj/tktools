@@ -51,7 +51,13 @@ Future<DtkConfigDb> _dtkConfigDbOpen({
         dbName,
       );
     } catch (e) {
-      stderr.writeln('error: $e, deleting $exportPath');
+      if (write ?? false) {
+        // Never export an empty database over a file that could not be read.
+        throw StateError(
+          'Cannot import $exportPath ($e), fix it first, it was not modified',
+        );
+      }
+      stderr.writeln('error: $e, ignoring $exportPath');
     }
   }
   db ??= await factory.openDatabase(dbName);

@@ -2,18 +2,18 @@ import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_common_utils/common_utils_import.dart';
 import 'package:tekartik_prj_tktools/dtk.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
+import 'package:tekartik_prj_tktools/src/dtk/dtk_config_export_path.dart';
+
 export 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
-var _initialized = false;
-late String _configExportPath;
+final _configExportPath = DtkConfigExportPath(
+  getDefaultPath: dtkGetHostEnvExportPath,
+  notSetMessage: 'host env export path not set',
+);
+
 Future<String> _dtkGetHostEnvConfigExportPath({
   @visibleForTesting String? configExportPath,
-}) async {
-  if (!_initialized) {
-    _configExportPath = await dtkGetHostEnvExportPath();
-  }
-  return _configExportPath;
-}
+}) => _configExportPath.get(configExportPath: configExportPath);
 
 /// tkpub action on db, import & export
 Future<T> dtkHostEnvConfigDbAction<T>(

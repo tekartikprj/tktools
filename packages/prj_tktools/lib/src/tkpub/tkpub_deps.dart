@@ -2,7 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:dev_build/menu/menu_run_ci.dart';
 import 'package:dev_build/package.dart';
 import 'package:dev_build/shell.dart';
-import 'package:fs_shim/utils/io/read_write.dart' show linesToIoString;
+import 'package:fs_shim/utils/io/read_write.dart' show stringToIoString;
 import 'package:fs_shim/utils/path.dart' show toPosixPath;
 import 'package:fs_shim/utils/path.dart';
 import 'package:path/path.dart';
@@ -98,6 +98,7 @@ class TkPubDepsManager {
   Future<void> clear() async {
     if (!options.pubspecOverrides) {
       stderr.writeln('Must specify --pubspec-overrides');
+      return;
     }
     Future<void> handlePath(String path) async {
       var workPath = await pathGetResolvedWorkPath(path);
@@ -131,7 +132,7 @@ class TkPubDepsManager {
     final toAdd = _PackageToAddList();
 
     await _dbAction((db) async {
-      final topPath = '.';
+      final topPath = path;
 
       for (var dep in deps) {
         var info = TkPubPackageInfo.parse(dep);
@@ -157,7 +158,7 @@ class TkPubDepsManager {
           Future<void> handlePath(String path) async {
             var subPath = relative(path, from: topPath);
             stdout.writeln('# $subPath');
-            var ioPackage = PubIoPackage(subPath);
+            var ioPackage = PubIoPackage(path);
             await ioPackage.ready;
             var pubspecMap = ioPackage.pubspecYaml;
             var dofPub = ioPackage.dofPub;
@@ -169,7 +170,7 @@ class TkPubDepsManager {
               }
               return;
             }
-            var shell = Shell(workingDirectory: subPath);
+            var shell = Shell(workingDirectory: path);
             var dev =
                 info.target == TkPubTarget.dev ||
                 (info.target == null && options.devDependencies);
@@ -195,7 +196,7 @@ class TkPubDepsManager {
                   throw StateError('Package not found $packageName');
                 }
                 toAdd.add(
-                  subPath,
+                  path,
                   shellArgument(
                     '$prefix'
                     '$packageName',
@@ -231,7 +232,7 @@ class TkPubDepsManager {
                   );
                 } else {
                   toAdd.add(
-                    subPath,
+                    path,
                     shellArgument(
                       '$prefix'
                       '$packageName:'
@@ -399,8 +400,9 @@ class TkPubDepsManager {
             }
 
             if (overrides.isNotEmpty) {
-              var lines = pubspecOverridesMap.toYamlStrings('');
-              var txt = linesToIoString(lines);
+              var txt = stringToIoString(
+                TkPubDepOverrides.mapToYaml(pubspecOverridesMap),
+              );
               await pubspecOverrideFile.writeAsString(txt);
             } else {
               if (pubspecOverrideFile.existsSync()) {
@@ -423,9 +425,6 @@ class TkPubDepsManager {
           }
 
           await _handleTopPath(topPath, handlePath);
-
-          //throw UnsupportedError('--$flagPubspcOverridesKey not implemented yet');
-          return;
         }
       }
     });
@@ -481,35 +480,5 @@ class _PackageToAddList {
       list.add(dartPubAddArg);
     }
     return map.entries.map((e) => _PackagesToAdd(e.key, e.value)).toList();
-  }
-}
-
-extension on Map {
-  Model sort() {
-    var sorted = Model();
-    var keys = (this.keys.toList()).cast<String>()..sort();
-    for (var key in keys) {
-      var value = this[key];
-      if (value is Map) {
-        value = value.sort();
-      }
-      sorted[key] = value;
-    }
-    return sorted;
-  }
-
-  List<String> toYamlStrings(String indent) {
-    var lines = <String>[];
-    var sorted = sort();
-    for (var key in keys) {
-      var value = sorted[key];
-      if (value is Map) {
-        lines.add('$indent$key:');
-        lines.addAll(value.toYamlStrings('$indent  '));
-      } else {
-        lines.add('$indent$key: ${safeYamlString(value)}');
-      }
-    }
-    return lines;
   }
 }

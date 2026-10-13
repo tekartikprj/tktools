@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:path/path.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_copy_files_cmd.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_list_cmd.dart';
 import 'package:tekartik_prj_tktools/src/bin/tkpub_symlink_cmd.dart';
@@ -9,6 +10,7 @@ import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/src/tkpub.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 import 'package:tekartik_prj_tktools/src/version.dart';
+import 'package:tekartik_prj_tktools/tkreg.dart';
 
 import 'tkpub_add_cmd.dart';
 import 'tkpub_config_cmd.dart';
@@ -81,8 +83,16 @@ class _InitCommand extends ShellBinCommand {
     if (rest.length != 1) {
       throw ArgumentError('One argument expected (path)');
     }
+    var exportPath = normalize(absolute(rest.first));
+    // The export path read by the tools (tkPubGetConfigExportPath).
+    var globalPrefs = await openGlobalPrefsPrefs();
+    await globalPrefs.setString(tkPubExportPathGlobalPrefsKey, exportPath);
+    // Also kept as a github top hint (tkPubFindGithubTop).
     var prefs = await openPrefs();
-    prefs.setString(prefsKeyConfigExportPath, rest.first);
+    prefs.setString(prefsKeyConfigExportPath, exportPath);
+    // Flush the write.
+    await prefs.close();
+    stdout.writeln('tkpub config export path: $exportPath');
     return true;
   }
 }

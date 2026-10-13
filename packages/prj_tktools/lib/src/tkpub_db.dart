@@ -1,6 +1,7 @@
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_prefs/prefs.dart';
 import 'package:tekartik_prj_tktools/dtk.dart';
+import 'package:tekartik_prj_tktools/src/dtk/dtk_config_export_path.dart';
 import 'package:tekartik_prj_tktools/src/tkpub.dart';
 
 import 'dock.dart';
@@ -133,28 +134,18 @@ var tkPubConfigRefRecord = configStore.cast<String, TkPubDbConfigRef>().record(
   'ref',
 );
 
-late String _configExportPath;
-var _initialized = false;
-
 void _initBuilders() {
   cvAddConstructors([TkPubDbPackage.new, TkPubDbConfigRef.new]);
 }
 
-Future<String> _tkPubGetConfigExportPath({String? configExportPath}) async {
-  if (!_initialized) {
-    configExportPath ??= await tkPubGetConfigExportPath();
+final _configExportPath = DtkConfigExportPath(
+  getDefaultPath: tkPubGetConfigExportPath,
+  notSetMessage: 'Not intialized, call tkpub init first',
+  initBuilders: _initBuilders,
+);
 
-    if (configExportPath == null) {
-      throw StateError('Not intialized, call tkpub_init first');
-    } else {
-      // cvAddConstructors([DbDtkGitConfigRef.new, DbDtkGitRepository.new]);
-      _configExportPath = configExportPath;
-      _initialized = true;
-    }
-    _initBuilders();
-  }
-  return _configExportPath;
-}
+Future<String> _tkPubGetConfigExportPath({String? configExportPath}) =>
+    _configExportPath.get(configExportPath: configExportPath);
 
 /// tkpub action on db, import & export
 Future<T> tkPubDbAction<T>(

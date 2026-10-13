@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:glob/glob.dart';
 import 'package:path/path.dart';
 import 'package:tekartik_app_text/diacritic.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
@@ -54,8 +55,12 @@ class TkFindCommand extends ShellBinCommand {
 }
 
 /// Options for the finder
+///
+/// Every filter given must match (words, globs, texts, exts); within one
+/// filter, any value matching is enough. The comparisons ignore case and
+/// diacritics.
 class FinderOptions {
-  /// Words to search for
+  /// Words to search for in the name (base name with its extension)
   final List<String> words;
 
   /// File only
@@ -67,7 +72,8 @@ class FinderOptions {
   /// Show hidden files
   final bool showHidden;
 
-  /// Globs to match
+  /// Globs to match, on the name, or on the path relative to the searched
+  /// path when the glob contains a `/`
   final List<String> globs;
 
   /// Texts to match in the base name
@@ -112,8 +118,13 @@ class Finder {
     return relative(entity.path, from: path);
   }
 
+  /// The top searched path, for the glob relative paths.
+  final String _topPath;
+
   /// Returns the absolute path of the entity
-  Finder(this.path, this.options);
+  Finder(this.path, this.options) : _topPath = path;
+
+  Finder._sub(this.path, this.options, this._topPath);
 
   /// Find files in the directory
   Stream<FileSystemEntity> find() async* {
@@ -122,9 +133,17 @@ class Finder {
     var dirOnly = options.dirOnly;
     var fileOnly = options.fileOnly;
     var showHidden = options.showHidden;
-    // ignore: unused_local_variable
-    var globs = options.globs
+    var words = options.words
         .map((e) => e.removeDiacritics().toLowerCase().trim())
+        .toList();
+    var globs = options.globs
+        .map(
+          (e) => Glob(
+            e.removeDiacritics().toLowerCase().trim(),
+            context: posix,
+            caseSensitive: false,
+          ),
+        )
         .toList();
     var texts = options.texts
         .map((e) => e.removeDiacritics().toLowerCase().trim())
@@ -146,10 +165,31 @@ class Finder {
         return false;
       }
 
-      var entityBasename = basename(entity.path).removeDiacritics();
+      var entityBasename = basename(
+        entity.path,
+      ).removeDiacritics().toLowerCase();
       var ext = extension(entityBasename);
       if (ext.startsWith('.')) {
         ext = ext.substring(1);
+      }
+
+      if (words.isNotEmpty) {
+        if (!words.any((word) => entityBasename.contains(word))) {
+          return false;
+        }
+      }
+      if (globs.isNotEmpty) {
+        var relativePath = posix
+            .joinAll(split(relative(entityPath, from: _topPath)))
+            .removeDiacritics()
+            .toLowerCase();
+        if (!globs.any(
+          (glob) => glob.matches(
+            glob.pattern.contains('/') ? relativePath : entityBasename,
+          ),
+        )) {
+          return false;
+        }
       }
 
       if (texts.isNotEmpty) {
@@ -254,7 +294,7 @@ class Finder {
       if (entity is Directory) {
         if (showHidden || !_isHidden(basename(entity.path))) {
           // Recursively search in subdirectories
-          var subFinder = Finder(entity.path, options);
+          var subFinder = Finder._sub(entity.path, options, _topPath);
           await for (var subEntity in subFinder.find()) {
             yield subEntity;
           }

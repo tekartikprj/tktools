@@ -384,11 +384,12 @@ class DtkStatusDb {
     return (await getCurrentTimepoint())?.id;
   }
 
+  /// Only the current timepoint changes, the other fields
+  /// (defaultTagFilter...) are kept.
   Future<void> _setCurrentTimepointId(Transaction txn, int? id) async {
-    await dbDtkStatusConfigRecord.put(
-      txn,
-      DbDtkStatusConfig()..currentTimepoint.v = id,
-    );
+    var config = await dbDtkStatusConfigRecord.get(txn) ?? DbDtkStatusConfig();
+    config.currentTimepoint.v = id;
+    await dbDtkStatusConfigRecord.put(txn, config);
   }
 
   /// Set the current timepoint
@@ -495,10 +496,7 @@ class DtkStatusDb {
     await db.transaction((txn) async {
       var currentTimepointId = await _getConfigCurrentTimepointId(txn);
       if (currentTimepointId == id) {
-        await dbDtkStatusConfigRecord.put(
-          txn,
-          DbDtkStatusConfig()..currentTimepoint.v = null,
-        );
+        await _setCurrentTimepointId(txn, null);
       }
       await dbDtkTimepointStore.record(id).delete(txn);
     });

@@ -1,6 +1,8 @@
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 import 'package:tekartik_prj_tktools/dtk.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk.dart';
+import 'package:tekartik_prj_tktools/src/dtk/dtk_config_export_path.dart';
+
 export 'package:tekartik_app_cv_sembast/app_cv_sembast.dart';
 
 /// Db Dependency config
@@ -76,29 +78,19 @@ var dtkDepDbConfigStore = cvStringStoreFactory.store<DbRecord<String>>(
   'config',
 );
 
-late String _configExportPath;
-var _initialized = false;
-
 void _initBuilders() {
   cvAddConstructors([DbDtkDepDependency.new]);
 }
 
-Future<String> _dtkGetDepConfigExportPath({String? configExportPath}) async {
-  if (!_initialized) {
-    configExportPath ??= await dtkGetDepExportPath();
+final _configExportPath = DtkConfigExportPath(
+  getDefaultPath: dtkGetDepExportPath,
+  notSetMessage:
+      'Dep config db not initialized, set global prefs $dtkDepExportPathGlobalPrefsKey',
+  initBuilders: _initBuilders,
+);
 
-    if (configExportPath == null) {
-      throw StateError(
-        'Git config db not initialized, set global prefs $dtkDepExportPathGlobalPrefsKey',
-      );
-    } else {
-      _configExportPath = configExportPath;
-      _initialized = true;
-    }
-    _initBuilders();
-  }
-  return _configExportPath;
-}
+Future<String> _dtkGetDepConfigExportPath({String? configExportPath}) =>
+    _configExportPath.get(configExportPath: configExportPath);
 
 /// tkpub action on db, import & export
 Future<T> dtkDepConfigDbAction<T>(

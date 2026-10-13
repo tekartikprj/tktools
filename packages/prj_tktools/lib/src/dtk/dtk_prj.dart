@@ -219,102 +219,57 @@ class DtkProject {
   Future<void> addAllProjectsToWorkspace({
     bool? keepExistingWorkspaceResolution,
   }) async {
-    var normalizedPath = normalize(absolute(path));
-
-    Future<void> recurse(String dirPath) async {
-      Stream<FileSystemEntity> stream;
-      try {
-        stream = Directory(dirPath).list(followLinks: false);
-      } catch (_) {
-        return;
-      }
-      await for (var entity in stream) {
-        if (entity is Directory) {
-          var name = basename(entity.path);
-          if (_isToBeIgnored(name)) {
-            continue;
+    await _walkSubDirs(path, (subPath) async {
+      var pubspecFile = File(join(subPath, 'pubspec.yaml'));
+      if (pubspecFile.existsSync()) {
+        try {
+          var pubIoPackage = PubIoPackage(subPath);
+          await pubIoPackage.ready;
+          if (pubIoPackage.isWorkspace) {
+            // Don't add the project if it is workspace itself and skip going down the tree
+            stdout.writeln(
+              'Skipping project as it is a workspace itself: $subPath',
+            );
+            return false;
           }
-          var subPath = entity.path;
-          if (normalize(absolute(subPath)) == normalizedPath) {
-            continue;
-          }
-          var pubspecFile = File(join(subPath, 'pubspec.yaml'));
-          if (pubspecFile.existsSync()) {
-            try {
-              var pubIoPackage = PubIoPackage(subPath);
-              await pubIoPackage.ready;
-              if (pubIoPackage.isWorkspace) {
-                // Don't add the project if it is workspace itself and skip going down the tree
-                stdout.writeln(
-                  'Skipping project as it is a workspace itself: $subPath',
-                );
-                continue;
-              }
-              if (keepExistingWorkspaceResolution ?? false) {
-                if (!pubIoPackage.hasWorkspaceResolution) {
-                  stdout.writeln(
-                    'Skipping project without workspace resolution: $subPath',
-                  );
-                  await recurse(subPath);
-                  continue;
-                }
-              }
-              var dtkProject = DtkProject(subPath);
-              await dtkProject.addToWorkspace();
-            } catch (e) {
-              stderr.writeln('Error checking project $subPath: $e');
+          if (keepExistingWorkspaceResolution ?? false) {
+            if (!pubIoPackage.hasWorkspaceResolution) {
+              stdout.writeln(
+                'Skipping project without workspace resolution: $subPath',
+              );
+              return true;
             }
           }
-          await recurse(subPath);
+          var dtkProject = DtkProject(subPath);
+          await dtkProject.addToWorkspace();
+        } catch (e) {
+          stderr.writeln('Error checking project $subPath: $e');
         }
       }
-    }
-
-    await recurse(path);
+      return true;
+    });
   }
 
   /// Get sub projects in inner directories (excluding self and sub-workspaces)
   Future<List<String>> getSubProjects() async {
     var list = <String>[];
-    var normalizedPath = normalize(absolute(path));
-
-    Future<void> recurse(String dirPath) async {
-      Stream<FileSystemEntity> stream;
-      try {
-        stream = Directory(dirPath).list(followLinks: false);
-      } catch (_) {
-        return;
-      }
-      await for (var entity in stream) {
-        if (entity is Directory) {
-          var name = basename(entity.path);
-          if (_isToBeIgnored(name)) {
-            continue;
+    await _walkSubDirs(path, (subPath) async {
+      var pubspecFile = File(join(subPath, 'pubspec.yaml'));
+      if (pubspecFile.existsSync()) {
+        try {
+          var pubIoPackage = PubIoPackage(subPath);
+          await pubIoPackage.ready;
+          if (pubIoPackage.isWorkspace) {
+            // Skip sub-workspaces and their trees
+            return false;
           }
-          var subPath = entity.path;
-          if (normalize(absolute(subPath)) == normalizedPath) {
-            continue;
-          }
-          var pubspecFile = File(join(subPath, 'pubspec.yaml'));
-          if (pubspecFile.existsSync()) {
-            try {
-              var pubIoPackage = PubIoPackage(subPath);
-              await pubIoPackage.ready;
-              if (pubIoPackage.isWorkspace) {
-                // Skip sub-workspaces and their trees
-                continue;
-              }
-              list.add(subPath);
-            } catch (e) {
-              stderr.writeln('Error checking project $subPath: $e');
-            }
-          }
-          await recurse(subPath);
+          list.add(subPath);
+        } catch (e) {
+          stderr.writeln('Error checking project $subPath: $e');
         }
       }
-    }
-
-    await recurse(path);
+      return true;
+    });
     list.sort();
     return list;
   }
@@ -369,4 +324,43 @@ class DtkProject {
     'deploy',
     'node_modules',
   };
+}
+
+/// Walk the sub directories of [rootPath] (links not followed, ignored names
+/// and [rootPath] itself skipped), calling [visit] on each one; its own sub
+/// directories are walked when [visit] returns true.
+///
+/// A folder that cannot be listed is skipped with a warning (it aborted the
+/// whole walk).
+Future<void> _walkSubDirs(
+  String rootPath,
+  Future<bool> Function(String dirPath) visit,
+) async {
+  var normalizedRootPath = normalize(absolute(rootPath));
+
+  Future<void> recurse(String dirPath) async {
+    List<FileSystemEntity> entities;
+    try {
+      entities = await Directory(dirPath).list(followLinks: false).toList();
+    } catch (e) {
+      stderr.writeln('Warning: cannot list $dirPath: $e');
+      return;
+    }
+    for (var entity in entities) {
+      if (entity is Directory) {
+        if (DtkProject._isToBeIgnored(basename(entity.path))) {
+          continue;
+        }
+        var subPath = entity.path;
+        if (normalize(absolute(subPath)) == normalizedRootPath) {
+          continue;
+        }
+        if (await visit(subPath)) {
+          await recurse(subPath);
+        }
+      }
+    }
+  }
+
+  await recurse(rootPath);
 }

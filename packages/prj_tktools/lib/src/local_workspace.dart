@@ -510,78 +510,21 @@ class LocalWorkspaceHelper {
   }
 
   /// Relative (to [path]) folders of the workspace (including the root `.`).
+  ///
+  /// The folders come from the resolved config of the config file
+  /// ([getOrResolve]); [config] is the loaded config, used as the cache key.
   Future<List<String>> resolveFolders(DtkLocalWorkspace config) async {
-    await getOrResolve();
+    var resolvedConfig = await getOrResolve();
     if (identical(config, _cachedConfig) && _cachedResolvedFolders != null) {
       return _cachedResolvedFolders!;
     }
 
     var folders = <String>['.'];
-
-    var resolvedConfig = await getResolvedConfig();
-    if (resolvedConfig != null) {
-      var resolved = resolvedConfig.resolved.v;
-      if (resolved != null) {
-        for (var entry in resolved) {
-          var p = entry.path.v;
-          if (p != null) {
-            folders.add(p);
-          }
-        }
-      }
-    } else {
-      for (var relTarget in config.links.v ?? <String>[]) {
-        var absoluteTarget = normalize(absolute(join(path, relTarget)));
-        folders.add(relative(absoluteTarget, from: absolute(path)));
-      }
-
-      for (var dirTarget in config.addDir.v ?? <String>[]) {
-        var absoluteTarget = normalize(absolute(join(path, dirTarget)));
-        if (!Directory(absoluteTarget).existsSync()) {
-          stderr.writeln('Warning: dir target $absoluteTarget does not exist');
-          continue;
-        }
-        folders.add(relative(absoluteTarget, from: absolute(path)));
-      }
-
-      final addGitList = config.addGit.v ?? [];
-      final addList = config.add.v ?? [];
-      if (addGitList.isNotEmpty || addList.isNotEmpty) {
-        var githubTop = normalize(
-          absolute(await tkPubFindGithubTop(dirPath: path)),
-        );
-        for (var packageName in addGitList) {
-          String gitUrl;
-          if (_isGitShortPath(packageName) || _isGitUrl(packageName)) {
-            gitUrl = _githubRelPath(packageName);
-          } else {
-            try {
-              var dbPackage = await tkPubDbAction(
-                (db) => db.getPackage(packageName),
-              );
-              gitUrl = dbPackage.gitUrl.v!;
-            } catch (_) {
-              stderr.writeln('Package $packageName not found in tkpub config');
-              continue;
-            }
-          }
-          var repoRelPath = _githubRelPath(gitUrl);
-          var localTarget = normalize(absolute(join(githubTop, repoRelPath)));
-          folders.add(relative(localTarget, from: absolute(path)));
-        }
-        for (var packageName in addList) {
-          try {
-            await tkPubDbAction((db) => db.getPackage(packageName));
-            var localTarget = await tkPubGetPackageLocalPath(
-              githubTop,
-              packageName,
-            );
-            folders.add(relative(localTarget, from: absolute(path)));
-          } catch (_) {
-            stderr.writeln('Package $packageName not found in tkpub config');
-            continue;
-          }
-        }
+    for (var entry
+        in resolvedConfig.resolved.v ?? <DtkResolvedLocalWorkspaceResolved>[]) {
+      var p = entry.path.v;
+      if (p != null) {
+        folders.add(p);
       }
     }
 
@@ -738,76 +681,35 @@ ${contentEntries.toString().trimRight()}
   /// Update `.claude/settings.json` with the resolved folders added to
   /// `permissions.additionalDirectories`.
   Future<void> setupClaude(DtkLocalWorkspace config) async {
-    var uniqueFolders = await resolveFolders(config);
+    var uniqueAbsolutePaths = await _uniqueAbsoluteFolders(config);
 
-    // Keep unique absolute paths
-    var uniqueAbsolutePaths = <String>[];
-    var seen = <String>{};
-    for (var folder in uniqueFolders) {
-      var absoluteFolder = normalize(absolute(join(path, folder)));
-      var normalizedFolder = posix.joinAll(split(absoluteFolder));
-      if (seen.add(normalizedFolder)) {
-        uniqueAbsolutePaths.add(normalizedFolder);
-      }
-    }
-
-    var claudeDir = Directory(join(path, '.claude'));
-    if (!claudeDir.existsSync()) {
-      claudeDir.createSync(recursive: true);
-    }
-
-    var settingsFile = File(join(claudeDir.path, 'settings.json'));
-    var settings = <String, dynamic>{};
-    if (settingsFile.existsSync()) {
-      try {
-        settings = (jsonDecode(settingsFile.readAsStringSync()) as Map)
-            .cast<String, dynamic>();
-      } catch (_) {}
-    }
-
-    // Get or create permissions map
-    var permissions = settings['permissions'];
-    if (permissions is! Map) {
-      permissions = <String, dynamic>{};
-      settings['permissions'] = permissions;
-    } else {
-      permissions = permissions.cast<String, dynamic>();
-    }
-
-    // Get or create additionalDirectories list
-    var additionalDirectories = permissions['additionalDirectories'];
-    if (additionalDirectories is! List) {
-      additionalDirectories = <dynamic>[];
-      permissions['additionalDirectories'] = additionalDirectories;
-    } else {
-      additionalDirectories = List<dynamic>.from(additionalDirectories);
-      permissions['additionalDirectories'] = additionalDirectories;
-    }
-
-    // Add unique folders if not already present
-    var modified = false;
-    for (var absoluteFolder in uniqueAbsolutePaths) {
-      if (!additionalDirectories.contains(absoluteFolder)) {
-        additionalDirectories.add(absoluteFolder);
-        modified = true;
-      }
-    }
-
-    if (modified) {
-      var encoder = const JsonEncoder.withIndent('  ');
-      settingsFile.writeAsStringSync('${encoder.convert(settings)}\n');
-      stdout.writeln('Updated ${settingsFile.path}');
-    } else {
-      stdout.writeln('No changes needed for ${settingsFile.path}');
-    }
+    var settingsFile = File(join(path, '.claude', 'settings.json'));
+    _updateSettingsPermissionsList(
+      settingsFile,
+      'additionalDirectories',
+      uniqueAbsolutePaths,
+    );
   }
 
   /// Update `.gemini/antigravity-cli/settings.json` with read/write
   /// permissions for the resolved folders.
   Future<void> setupAgy(DtkLocalWorkspace config) async {
-    var uniqueFolders = await resolveFolders(config);
+    var uniqueAbsolutePaths = await _uniqueAbsoluteFolders(config);
 
-    // Keep unique absolute paths
+    var settingsFile = File(
+      join(path, '.gemini', 'antigravity-cli', 'settings.json'),
+    );
+    _updateSettingsPermissionsList(settingsFile, 'allow', [
+      for (var absoluteFolder in uniqueAbsolutePaths) ...[
+        'read_file($absoluteFolder)',
+        'write_file($absoluteFolder)',
+      ],
+    ]);
+  }
+
+  /// Unique absolute posix paths of the resolved folders.
+  Future<List<String>> _uniqueAbsoluteFolders(DtkLocalWorkspace config) async {
+    var uniqueFolders = await resolveFolders(config);
     var uniqueAbsolutePaths = <String>[];
     var seen = <String>{};
     for (var folder in uniqueFolders) {
@@ -817,62 +719,75 @@ ${contentEntries.toString().trimRight()}
         uniqueAbsolutePaths.add(normalizedFolder);
       }
     }
+    return uniqueAbsolutePaths;
+  }
+}
 
-    var agyDir = Directory(join(path, '.gemini', 'antigravity-cli'));
-    if (!agyDir.existsSync()) {
-      agyDir.createSync(recursive: true);
-    }
-
-    var settingsFile = File(join(agyDir.path, 'settings.json'));
-    var settings = <String, dynamic>{};
-    if (settingsFile.existsSync()) {
+/// Add [entries] to the `permissions.<listKey>` list of the json
+/// [settingsFile], keeping every other setting.
+///
+/// A settings file that cannot be read as a json object is left untouched and
+/// a [StateError] is thrown (it used to be overwritten with only the
+/// permissions).
+void _updateSettingsPermissionsList(
+  File settingsFile,
+  String listKey,
+  List<String> entries,
+) {
+  var settings = <String, dynamic>{};
+  if (settingsFile.existsSync()) {
+    var content = settingsFile.readAsStringSync();
+    if (content.trim().isNotEmpty) {
+      Object? decoded;
       try {
-        settings = (jsonDecode(settingsFile.readAsStringSync()) as Map)
-            .cast<String, dynamic>();
-      } catch (_) {}
-    }
-
-    // Get or create permissions map
-    var permissions = settings['permissions'];
-    if (permissions is! Map) {
-      permissions = <String, dynamic>{};
-      settings['permissions'] = permissions;
-    } else {
-      permissions = permissions.cast<String, dynamic>();
-    }
-
-    // Get or create allow list
-    var allow = permissions['allow'];
-    if (allow is! List) {
-      allow = <dynamic>[];
-      permissions['allow'] = allow;
-    } else {
-      allow = List<dynamic>.from(allow);
-      permissions['allow'] = allow;
-    }
-
-    // Add unique folders if not already present
-    var modified = false;
-    for (var absoluteFolder in uniqueAbsolutePaths) {
-      var readPermission = 'read_file($absoluteFolder)';
-      var writePermission = 'write_file($absoluteFolder)';
-
-      if (!allow.contains(readPermission)) {
-        allow.add(readPermission);
-        modified = true;
+        decoded = jsonDecode(content);
+      } catch (e) {
+        throw StateError(
+          'Cannot read ${settingsFile.path} ($e), fix it or remove it, it was not modified',
+        );
       }
-      if (!allow.contains(writePermission)) {
-        allow.add(writePermission);
-        modified = true;
+      if (decoded is! Map) {
+        throw StateError(
+          '${settingsFile.path} is not a json object, fix it or remove it, it was not modified',
+        );
       }
+      settings = decoded.cast<String, dynamic>();
     }
+  }
 
-    if (modified) {
-      var encoder = const JsonEncoder.withIndent('  ');
-      settingsFile.writeAsStringSync('${encoder.convert(settings)}\n');
-      stdout.writeln('Updated ${settingsFile.path}');
-    } else {
-      stdout.writeln('No changes needed for ${settingsFile.path}');
+  // Get or create permissions map
+  var permissions = settings['permissions'];
+  if (permissions is! Map) {
+    permissions = <String, dynamic>{};
+    settings['permissions'] = permissions;
+  } else {
+    permissions = permissions.cast<String, dynamic>();
+  }
+
+  // Get or create the list
+  var list = permissions[listKey];
+  if (list is! List) {
+    list = <dynamic>[];
+  } else {
+    list = List<dynamic>.from(list);
+  }
+  permissions[listKey] = list;
+
+  // Add unique entries if not already present
+  var modified = false;
+  for (var entry in entries) {
+    if (!list.contains(entry)) {
+      list.add(entry);
+      modified = true;
     }
+  }
+
+  if (modified) {
+    settingsFile.parent.createSync(recursive: true);
+    var encoder = const JsonEncoder.withIndent('  ');
+    settingsFile.writeAsStringSync('${encoder.convert(settings)}\n');
+    stdout.writeln('Updated ${settingsFile.path}');
+  } else {
+    stdout.writeln('No changes needed for ${settingsFile.path}');
   }
 }
