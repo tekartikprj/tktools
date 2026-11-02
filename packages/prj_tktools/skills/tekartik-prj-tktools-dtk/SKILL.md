@@ -8,7 +8,10 @@ description: >-
   versions (dtk/dtk_dep.dart, DbDtkDepDependency, dtkDepConfigDbAction,
   dtkDepGetAllDependencies), dtkHostEnvVarGet/Set, the dsenv user env vars
   (dsUserEnvGetVar, dsUserEnvSetEncryptedVar, dtkHostname), openGlobalPrefsPrefs
-  and the dtkMenu / DtkProject helpers.
+  and the dtkMenu / DtkProject helpers. Also use the dtk command line (dtk
+  repos / repo / packages / package / path / sync, --json) or DtkRegistry to
+  find where a registered repository or package is checked out, which packages
+  a repository holds, and which clones are missing.
 ---
 
 # dtk: multi-project databases, host env and menus (tekartik_prj_tktools)
@@ -42,6 +45,37 @@ VM only (`dart:io`, shells, prefs on disk).
 * One library must not import two of `dtk.dart`, `dtk/dtk_dep.dart` and
   `tkpub.dart` at once: each brings an extension on `DtkConfigDb` with a `db`
   getter and the call becomes ambiguous. Keep one database per library.
+
+### The dtk command line (lookups)
+
+* Prefer it to reading the JSONL exports: it joins the git registry and the
+  tkpub registry and resolves the local paths. Read only, except `sync
+  --clone`. Every command but `path` takes `--json`; errors go to stderr with
+  exit code 1.
+* The executable comes from the tools package installed globally next to
+  `tkpub` (`which dtk`); this package only exports `dtkMain(arguments)`, the
+  one line of a `bin/dtk.dart`.
+  ```bash
+  dtk repos [--tag 'public && !flutter']  # [{id, gitUrl, tags, omit, path, cloned, packages}]
+  dtk repo sembast                        # id, git url, owner/repo, repo, or repo minus .dart
+  dtk packages [--repo cv.dart] [--published]  # [{name, gitUrl, gitPath, published, repo, path, exists}]
+  dtk package cv
+  dtk path sembast                        # a package path, else a repository path
+  dtk sync [--tag main] [--clone]         # {gitTop, missing, unregistered, cloned, failed}
+  ```
+* A repository query that matches several ids fails with the list (`dtk repo
+  cv.dart` when a fork is registered too): pass `owner/repo` or the full id.
+* `missing` leaves the `omit` repositories out; `unregistered` lists the
+  `<git top>/<host>/<owner>/<repo>` checkouts (with a `.git`) the registry does
+  not know.
+* Global options, before the command: `--git-top`,
+  `--git-config-export-path`, `--pub-config-export-path` (default: global
+  prefs, `TEKARTIK_GIT_TOP` or the folder holding the nearest `github.com`).
+* From Dart: `DtkRegistry.load(gitTop:, gitConfigExportPath:,
+  pubConfigExportPath:, requirePackages:)`, then `repos`, `packages`,
+  `findRepos(query)`, `findPackage(name)`, `packagesInRepo(id)`,
+  `reposWithTags(filter)`, `missingRepos()`, `unregisteredCheckouts()`;
+  `DtkRegistryRepo` and `DtkRegistryPackage` have `toJson()`.
 
 ### The config database pattern
 

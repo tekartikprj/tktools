@@ -1,6 +1,7 @@
 /// Tools for Dart handling multiple projects
 library;
 
+export 'src/bin/dtk.dart' show DtkCommand, dtkMain;
 export 'src/dtk/dtk.dart'
     show
         dtkGitExportPathGlobalPrefsKey,
@@ -20,3 +21,5 @@ export 'src/dtk/dtk_git_config_db.dart'
 export 'src/dtk/dtk_host_env_config_db.dart'
     show dtkHostEnvVarGet, dtkHostEnvVarSet;
 export 'src/dtk/dtk_menu.dart' show dtkMenu;
+export 'src/dtk/dtk_registry.dart'
+    show DtkRegistry, DtkRegistryPackage, DtkRegistryRepo;
