@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fs_shim/fs_memory.dart';
+import 'package:path/path.dart' as p;
 import 'package:tekartik_app_cv_sdb/app_cv_sdb.dart';
 import 'package:tekartik_prj_tktools/dart_project_cache.dart';
 import 'package:test/test.dart';
@@ -493,8 +494,16 @@ void main() {
       project('/git/github.com/other/Élio', name: 'élio'),
     ];
 
-    List<String> search(String query, {String? from, int? limit}) =>
-        paths(searchDartProjects(projects, query, from: from, limit: limit));
+    // posix paths on every platform (windows included).
+    List<String> search(String query, {String? from, int? limit}) => paths(
+      searchDartProjects(
+        projects,
+        query,
+        from: from,
+        limit: limit,
+        context: p.posix,
+      ),
+    );
 
     test('lower case, no diacritics', () {
       expect(search('ELIO'), ['/git/github.com/other/Élio']);
