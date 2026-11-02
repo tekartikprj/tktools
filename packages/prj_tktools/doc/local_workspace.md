@@ -90,7 +90,7 @@ resolved input, so they make the cache check always report a change).
 
 ## Command line
 
-From `package:tekartik_prj_tools` (`bin/local_workspace.dart`):
+The `local_workspace` command line (not shipped by this package):
 
 ```shell
 # Create the symlinks declared by links/add-git/add (add-dir has none)

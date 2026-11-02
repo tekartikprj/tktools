@@ -187,10 +187,10 @@ void main() {
         remote: 'git@github.com:tekartik/sqflite.git',
       );
       await writeProject(fs, 'git/github.com/tekartik/sqflite/sqflite');
-      await writeGit(fs, 'git/github.com/alextekartik/workspaces.dart');
+      await writeGit(fs, 'git/github.com/example/workspaces.dart');
       await writeLocalWorkspace(
         fs,
-        'git/github.com/alextekartik/workspaces.dart/projects/tekaly_buzz',
+        'git/github.com/example/workspaces.dart/projects/my_app',
       );
       // A local workspace wins over a dart project.
       await writeLocalWorkspace(fs, 'git/both');
@@ -212,7 +212,7 @@ void main() {
       var result = await DartProjectScanner(fs, '/git').scan();
       expect(paths(result.projects), [
         '/git/both',
-        '/git/github.com/alextekartik/workspaces.dart/projects/tekaly_buzz',
+        '/git/github.com/example/workspaces.dart/projects/my_app',
         '/git/github.com/tekartik/sqflite/sqflite',
       ]);
       expect(result.projects.map((project) => project.kind), [
@@ -220,9 +220,9 @@ void main() {
         DartProjectKind.localWorkspace,
         DartProjectKind.dart,
       ]);
-      expect(result.projects[1].name, 'tekaly_buzz');
+      expect(result.projects[1].name, 'my_app');
       expect(gitPaths(result.gitFolders), [
-        '/git/github.com/alextekartik/workspaces.dart',
+        '/git/github.com/example/workspaces.dart',
         '/git/github.com/tekartik/sqflite',
         '/git/worktree',
       ]);
@@ -491,7 +491,7 @@ void main() {
       project('/git/github.com/tekartik/app/app_sqflite'),
       project('/git/github.com/tekartik/app/app_common'),
       project('/git/github.com/other/sqflite'),
-      project('/git/github.com/other/Élio', name: 'élio'),
+      project('/git/github.com/other/Éclair', name: 'éclair'),
     ];
 
     // posix paths on every platform (windows included).
@@ -506,8 +506,8 @@ void main() {
     );
 
     test('lower case, no diacritics', () {
-      expect(search('ELIO'), ['/git/github.com/other/Élio']);
-      expect(search('élio'), ['/git/github.com/other/Élio']);
+      expect(search('ECLAIR'), ['/git/github.com/other/Éclair']);
+      expect(search('éclair'), ['/git/github.com/other/Éclair']);
       expect(search('none'), isEmpty);
     });
 
@@ -550,7 +550,7 @@ void main() {
       expect(search('app common'), ['/git/github.com/tekartik/app/app_common']);
       // `other` is only in the path.
       expect(search('other'), [
-        '/git/github.com/other/Élio',
+        '/git/github.com/other/Éclair',
         '/git/github.com/other/sqflite',
       ]);
       expect(search('tekartik sqflite', limit: 1), [
@@ -566,7 +566,7 @@ void main() {
       expect(search(' '), hasLength(projects.length));
       expect(search('', from: '/git/github.com/other'), [
         '/git/github.com/other/sqflite',
-        '/git/github.com/other/Élio',
+        '/git/github.com/other/Éclair',
         '/git/github.com/tekartik/app/app_common',
         '/git/github.com/tekartik/app/app_sqflite',
         '/git/github.com/tekartik/sqflite/example',
@@ -614,10 +614,10 @@ void main() {
       );
       expect(
         gitWebUri(
-          'git@gitlab.com:alexrx/exp.flutter.git',
+          'git@gitlab.com:example/exp.flutter.git',
           subPath: 'a',
         ).toString(),
-        'https://gitlab.com/alexrx/exp.flutter/-/tree/HEAD/a',
+        'https://gitlab.com/example/exp.flutter/-/tree/HEAD/a',
       );
       expect(
         gitWebUri('git@bitbucket.org:tekartik/x.git', subPath: 'a').toString(),
@@ -625,8 +625,8 @@ void main() {
       );
       // An ssh host alias.
       expect(
-        gitWebUri('git@github.com-hublot:hublot/scan').toString(),
-        'https://github.com/hublot/scan',
+        gitWebUri('git@github.com-work:example/scan').toString(),
+        'https://github.com/example/scan',
       );
       expect(gitWebUri('git@myhost.com:o/r.git'), isNull);
       expect(gitWebUri('/local/path/repo'), isNull);

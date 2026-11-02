@@ -4,12 +4,12 @@ import 'package:test/test.dart';
 void main() {
   test('findUrlPath', () {
     expect(
-      safeGetUrlPath('https://github.com/tekartikprj/tkmail'),
-      '/tekartikprj/tkmail',
+      safeGetUrlPath('https://github.com/tekartik/common_utils.dart'),
+      '/tekartik/common_utils.dart',
     );
     expect(
-      safeGetUrlPath('git@github.com:tekartikprj/tkmail.git'),
-      '/tekartikprj/tkmail.git',
+      safeGetUrlPath('git@github.com:tekartik/common_utils.dart.git'),
+      '/tekartik/common_utils.dart.git',
     );
   });
 }

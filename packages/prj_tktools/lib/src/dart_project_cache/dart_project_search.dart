@@ -3,7 +3,7 @@ import 'package:tekartik_app_text/diacritic.dart';
 
 import 'dart_project.dart';
 
-/// Lower case, diacritics free text, so that typing `elio` finds `Élio`.
+/// Lower case, diacritics free text, so that typing `eclair` finds `Éclair`.
 String dartProjectSearchNormalize(String text) =>
     text.toLowerCase().removeDiacritics();
 
