@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:process_run/shell.dart' show ShellEnvironment;
+import 'package:process_run/shell.dart' show ShellEnvironment, ShellProcesses;
 
 /// A started process, its output as lines.
 abstract class HostCiProcess {
@@ -19,9 +19,10 @@ abstract class HostCiProcess {
   /// The exit code, once exited (negative when killed by a signal).
   Future<int> get exitCode;
 
-  /// Kill the process and its children (sigterm, [force] for sigkill).
+  /// Kill the process and its descendants (sigterm, [force] for sigkill).
   ///
-  /// Returns true when the signal was delivered.
+  /// Returns true when the process was still running (the signals are sent
+  /// right after, once its descendants are known).
   bool kill({bool force = false});
 }
 
@@ -43,10 +44,15 @@ abstract class HostCiProcessStarter {
 /// Starts real processes.
 ///
 /// The executable is resolved through process_run's shell environment (the
-/// user `env.yaml` paths: nvm's node, flutter, Android tools). On Linux and
-/// macOS the process gets its own process group (`setsid`) so that killing
-/// it kills the whole tree: `flutter test` spawns `dart test`, which spawns
-/// chrome or node.
+/// user `env.yaml` paths: nvm's node, flutter, Android tools). Killing a
+/// process kills its whole tree (`ShellProcesses`, by parent pid): `flutter
+/// test` spawns `dart test`, which spawns chrome or node.
+///
+/// Where `setsid` is found (Linux, not macOS), the process gets its own
+/// session and process group: away from the terminal of `dtk ci` (ctrl-c
+/// does not reach it, a password prompt fails instead of waiting) and its
+/// group is killed too (an orphan of the tree, its parent gone, is still in
+/// it).
 class HostCiIoProcessStarter implements HostCiProcessStarter {
   /// The environment the processes run in, process_run's by default.
   final ShellEnvironment environment;
@@ -116,7 +122,16 @@ class _IoProcess implements HostCiProcess {
   /// True when the process is the leader of its own process group.
   final bool processGroup;
 
-  _IoProcess(this.process, {required this.processGroup});
+  /// True once exited.
+  var _exited = false;
+
+  _IoProcess(this.process, {required this.processGroup}) {
+    unawaited(
+      process.exitCode.then((_) {
+        _exited = true;
+      }),
+    );
+  }
 
   @override
   int get pid => process.pid;
@@ -134,23 +149,28 @@ class _IoProcess implements HostCiProcess {
 
   @override
   bool kill({bool force = false}) {
+    if (_exited) {
+      return false;
+    }
     var signal = force ? ProcessSignal.sigkill : ProcessSignal.sigterm;
-    var killed = false;
+    unawaited(_killTree(signal));
+    return true;
+  }
+
+  /// Sends [signal] to the process, its descendants (read before any signal:
+  /// an orphan gets another parent) and its process group; sigkill after 5
+  /// seconds for the ones still running.
+  Future<void> _killTree(ProcessSignal signal) async {
+    var descendants = await ShellProcesses.descendantsOf(process.pid);
     if (processGroup) {
       try {
         // A negative pid: the whole process group.
-        killed = Process.killPid(-process.pid, signal);
+        Process.killPid(-process.pid, signal);
       } catch (_) {
-        killed = false;
+        // Gone already.
       }
     }
-    try {
-      // The leader itself, whether the group kill worked or not.
-      killed = process.kill(signal) || killed;
-    } catch (_) {
-      // Gone already.
-    }
-    return killed;
+    await ShellProcesses.kill([process.pid, ...descendants], signal: signal);
   }
 }
 
