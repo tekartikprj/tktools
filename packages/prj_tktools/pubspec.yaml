@@ -74,6 +74,7 @@ dependencies:
       url: https://github.com/tekartik/prefs.dart
       path: prefs_sembast
   pool: any
+  synchronized: ">=3.4.0"
   pub_semver: any
 dev_dependencies:
   lints: ">=6.1.0"

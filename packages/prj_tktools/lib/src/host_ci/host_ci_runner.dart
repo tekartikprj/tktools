@@ -1,0 +1,826 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+import 'package:pub_semver/pub_semver.dart';
+import 'package:tekartik_prj_tktools/src/host_ci/host_ci_git.dart';
+import 'package:tekartik_prj_tktools/src/host_ci/host_ci_model.dart';
+import 'package:tekartik_prj_tktools/src/host_ci/host_ci_process.dart';
+import 'package:tekartik_prj_tktools/src/host_ci/host_ci_store.dart';
+
+/// One line of output of a run.
+class HostCiOutputLine {
+  /// The text, without the end of line.
+  final String text;
+
+  /// True for a line written on stderr, or reported by the runner itself.
+  final bool isError;
+
+  /// Creates a line.
+  const HostCiOutputLine(this.text, {this.isError = false});
+
+  @override
+  String toString() => text;
+}
+
+/// Prefix of the package marker lines of `run_ci`.
+const hostCiPackageMarker = '# package: ';
+
+/// Prefix of the command lines echoed by `run_ci`.
+const hostCiCommandMarker = r'$ ';
+
+/// The `run_ci` command, run with `dart pub global run`.
+const hostCiRunCiPackage = 'dev_build:run_ci';
+
+/// The failing command and package of a `run_ci` error line.
+///
+/// `run_ci` carries on after a failing package and reports it as
+/// `ERROR ShellException(<command>, exitCode <n>, workingDirectory: <dir>) in <dir>`
+/// (and once more at the end, `run_ci failed ShellException(...)`). The first
+/// such line of a step names the package that failed first, like the GitHub
+/// log does; the last `# package:` marker before the exit would name the
+/// last package run, not the failing one.
+({String command, String package})? hostCiParseRunCiError(String line) {
+  var match = RegExp(
+    r'ShellException\((.*), exitCode -?\d+, workingDirectory: ([^)]+)\)',
+  ).firstMatch(line);
+  if (match == null) {
+    return null;
+  }
+  return (command: match.group(1)!.trim(), package: match.group(2)!.trim());
+}
+
+/// The `dart` arguments of a step of [project]: `pub global run
+/// dev_build:run_ci`, the step arguments, `--recursive` and the project extra
+/// arguments.
+List<String> hostCiStepArguments(
+  DbHostCiProject project,
+  HostCiStepName step,
+) => [
+  'pub',
+  'global',
+  'run',
+  hostCiRunCiPackage,
+  ...step.runCiArguments,
+  '--recursive',
+  ...?project.extraArgs.v,
+];
+
+/// The step run by the `dart` [arguments] of a step process
+/// ([hostCiStepArguments]), null for another command (a fake process
+/// starter uses it).
+HostCiStepName? hostCiStepOfArguments(List<String> arguments) {
+  var index = arguments.indexOf(hostCiRunCiPackage);
+  if (index < 0) {
+    return null;
+  }
+  var rest = arguments.sublist(index + 1);
+  for (var step in HostCiStepName.values) {
+    var stepArguments = step.runCiArguments;
+    if (rest.length > stepArguments.length &&
+        rest[stepArguments.length] == '--recursive') {
+      var same = true;
+      for (var i = 0; i < stepArguments.length; i++) {
+        if (rest[i] != stepArguments[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        return step;
+      }
+    }
+  }
+  return null;
+}
+
+/// The folders never searched for lock files.
+const _lockFilesSkippedDirs = {'build', 'node_modules', 'deploy'};
+
+/// The `pubspec.lock` files below [root] (hidden, build and node_modules
+/// folders skipped) with their content, keyed by path.
+Future<Map<String, String>> hostCiReadLockFiles(String root) async {
+  var files = <String, String>{};
+  Future<void> visit(Directory dir) async {
+    List<FileSystemEntity> entities;
+    try {
+      entities = await dir.list(followLinks: false).toList();
+    } catch (_) {
+      return;
+    }
+    for (var entity in entities) {
+      var name = p.basename(entity.path);
+      if (entity is File && name == 'pubspec.lock') {
+        try {
+          files[entity.path] = await entity.readAsString();
+        } catch (_) {}
+      } else if (entity is Directory &&
+          !name.startsWith('.') &&
+          !_lockFilesSkippedDirs.contains(name)) {
+        await visit(entity);
+      }
+    }
+  }
+
+  await visit(Directory(root));
+  return files;
+}
+
+/// Put back the lock files [saved] by [hostCiReadLockFiles] below [root]:
+/// the saved ones rewritten, the ones that did not exist then deleted.
+Future<void> hostCiRestoreLockFiles(
+  String root,
+  Map<String, String> saved,
+) async {
+  var now = await hostCiReadLockFiles(root);
+  for (var path in now.keys) {
+    if (!saved.containsKey(path)) {
+      try {
+        await File(path).delete();
+      } catch (_) {}
+    }
+  }
+  for (var entry in saved.entries) {
+    if (now[entry.key] != entry.value) {
+      await File(entry.key).writeAsString(entry.value, flush: true);
+    }
+  }
+}
+
+/// Runs the CI of one project: the git facts, then one `run_ci` process per
+/// step in the repository root, the record and the log kept up to date.
+///
+/// The steps depend on each other: a failing step with the fail policy (the
+/// default, always for the pub steps) skips the following ones; a warning or
+/// an accepted failure does not. The lock files are saved before the
+/// downgrade and put back after it, whatever happens.
+///
+/// The output goes to [onLines] (buffered, [flushDelay]) and to the log file,
+/// every change of the run record to [onRun]. [cancel] kills the current
+/// process (and its children), the remaining steps are cancelled.
+class HostCiRunner {
+  /// The database.
+  final HostCiStore store;
+
+  /// Where the log files go.
+  final String logsDir;
+
+  /// Starts the processes.
+  final HostCiProcessStarter starter;
+
+  /// The project to run.
+  final DbHostCiProject project;
+
+  /// What started the run.
+  final HostCiTrigger trigger;
+
+  /// Who runs it (`dtk ci`, an app name).
+  final String? client;
+
+  /// The steps to run (a retry), [DbHostCiProjectExt.enabledSteps] when null.
+  final List<HostCiStepName>? steps;
+
+  /// How partial the run is (with [steps]), null for a full run.
+  final HostCiPartial? partial;
+
+  /// The settings at run time.
+  final DbHostCiSettings settings;
+
+  /// Called with the new output lines.
+  final void Function(List<HostCiOutputLine> lines)? onLines;
+
+  /// Called when the run record changes (same record, updated).
+  final void Function(DbHostCiRun run)? onRun;
+
+  /// Called once the run record is added (its key known).
+  final Future<void> Function(DbHostCiRun run)? onAdded;
+
+  /// How long output lines are buffered before being reported.
+  final Duration flushDelay;
+
+  /// How often the heartbeat is written while running.
+  final Duration heartbeatInterval;
+
+  /// How long a cancelled process gets to exit before being killed for good.
+  final Duration killTimeout;
+
+  /// The clock, replaced in the tests.
+  final DateTime Function() now;
+
+  var _cancelled = false;
+  HostCiProcess? _process;
+  Timer? _killTimer;
+  Timer? _flushTimer;
+  Timer? _heartbeatTimer;
+  final _pendingLines = <HostCiOutputLine>[];
+  IOSink? _logSink;
+  DbHostCiRun? _run;
+  Future<void>? _running;
+
+  /// Creates a runner, [start] starts it.
+  HostCiRunner({
+    required this.store,
+    required this.logsDir,
+    required this.starter,
+    required this.project,
+    required this.trigger,
+    required this.settings,
+    this.client,
+    this.steps,
+    this.partial,
+    this.onLines,
+    this.onRun,
+    this.onAdded,
+    this.flushDelay = const Duration(milliseconds: 100),
+    this.heartbeatInterval = const Duration(seconds: 10),
+    this.killTimeout = const Duration(seconds: 5),
+    DateTime Function()? now,
+  }) : now = now ?? DateTime.now;
+
+  /// True once [cancel] was called.
+  bool get cancelled => _cancelled;
+
+  /// The run record, null before [start].
+  DbHostCiRun? get run => _run;
+
+  /// Run the steps, never throws: a failure is in the record.
+  ///
+  /// Returns the saved run record.
+  Future<DbHostCiRun> start() async {
+    if (_running != null) {
+      throw StateError('already running');
+    }
+    var completer = Completer<void>();
+    _running = completer.future;
+    try {
+      return await _run_();
+    } finally {
+      completer.complete();
+    }
+  }
+
+  Future<DbHostCiRun> _run_() async {
+    var startTime = now();
+    var steps = this.steps ?? project.enabledSteps;
+    var run = _run = DbHostCiRun()
+      ..project.v = project.id
+      ..path.v = project.path.v
+      ..trigger.v = trigger.name
+      ..partial.v = partial?.name
+      ..client.v = client
+      ..pid.v = pid
+      ..start.v = startTime.millisecondsSinceEpoch
+      ..heartbeat.v = startTime.millisecondsSinceEpoch
+      ..status.v = HostCiRunStatus.running.name
+      ..steps.v = [
+        for (var step in steps)
+          () {
+            var policy = project.policyOf(step);
+            return DbHostCiStep()
+              ..name.v = step.name
+              ..status.v = HostCiStepStatus.pending.name
+              ..policy.v = policy.policy == HostCiFailurePolicy.fail
+                  ? null
+                  : policy.policy.name
+              ..severity.v = policy.policy == HostCiFailurePolicy.warn
+                  ? policy.severity.name
+                  : null;
+          }(),
+      ];
+    run = _run = await store.addRun(run);
+    run.log.v = _logRelativePath(run);
+    await onAdded?.call(run);
+    _notify();
+    try {
+      await _openLog(run);
+      _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
+        run.heartbeat.v = now().millisecondsSinceEpoch;
+        unawaited(store.putRun(run).catchError((_) {}));
+      });
+      await _runSteps(run);
+    } catch (e, st) {
+      _addLine('$e', isError: true);
+      _addLine('$st', isError: true);
+      run
+        ..status.v = HostCiRunStatus.error.name
+        ..error.v = '$e';
+    } finally {
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+      run.end.v = now().millisecondsSinceEpoch;
+      _flush();
+      await _closeLog();
+      await store.putRun(run);
+      await _applyRetention(run);
+      _notify();
+    }
+    return run;
+  }
+
+  Future<void> _runSteps(DbHostCiRun run) async {
+    var path = project.path.v ?? '';
+    var stepRecords = run.stepList;
+
+    void fail(String message) {
+      _addLine(message, isError: true);
+      run
+        ..status.v = HostCiRunStatus.error.name
+        ..error.v = message;
+      for (var step in stepRecords) {
+        step.status.v = HostCiStepStatus.skipped.name;
+      }
+    }
+
+    // The checkout.
+    if (path.isEmpty || !Directory(path).existsSync()) {
+      fail('Folder not found: $path');
+      return;
+    }
+    if (!hostCiIsGitCheckout(path)) {
+      fail('Not a git checkout: $path');
+      return;
+    }
+    var git = await hostCiReadGitFacts(
+      path,
+      fetch: settings.fetchBeforeRunValue,
+    );
+    if (git != null) {
+      run
+        ..head.v = git.head
+        ..branch.v = git.branch
+        ..commitTime.v = git.commitTime?.millisecondsSinceEpoch
+        ..dirty.v = git.dirty
+        ..ahead.v = git.ahead
+        ..behind.v = git.behind;
+      _addLine(
+        '# ${project.id} at ${git.shortHead}'
+        '${git.branch == null ? '' : ' (${git.branch})'}'
+        '${git.isClean ? ', clean' : ', ${git.dirty} modified file${git.dirty > 1 ? 's' : ''}'}'
+        '${git.ahead == null ? '' : ', ${git.ahead} ahead'}',
+      );
+    }
+    var options = project.optionsSummary;
+    if (options.isNotEmpty) {
+      _addLine('# options: $options');
+    }
+    await store.putRun(run);
+    _notify();
+    if (_cancelled) {
+      _cancelSteps(run);
+      return;
+    }
+
+    // The tools.
+    var dartVersion = await _readVersion(path, 'dart', ['--version']);
+    run.dartVersion.v = dartVersion;
+    if (dartVersion == null) {
+      fail('dart not found');
+      return;
+    }
+    var runCiVersion = await _readVersion(path, 'dart', [
+      'pub',
+      'global',
+      'run',
+      hostCiRunCiPackage,
+      '--version',
+    ]);
+    run.runCiVersion.v = runCiVersion;
+    if (runCiVersion == null) {
+      fail(
+        'run_ci not found, activate it: dart pub global activate dev_build '
+        '(or pubglobalupdate)',
+      );
+      return;
+    }
+    run.flutterVersion.v = await starter.readFlutterVersion();
+    _addLine(
+      '# dart $dartVersion'
+      '${run.flutterVersion.v == null ? '' : ', flutter ${run.flutterVersion.v}'}'
+      ', run_ci $runCiVersion',
+    );
+    await store.putRun(run);
+    _notify();
+
+    // The steps, each one depending on the previous ones.
+    var blocked = false;
+    Map<String, String>? savedLockFiles;
+    try {
+      for (var index = 0; index < stepRecords.length; index++) {
+        var stepRecord = stepRecords[index];
+        var step = stepRecord.stepName;
+        // The downgrade is always undone once started.
+        var restore = step == HostCiStepName.pubRestore;
+        if (restore && savedLockFiles != null) {
+          var saved = savedLockFiles;
+          savedLockFiles = null;
+          await hostCiRestoreLockFiles(path, saved);
+          _addLine('# ${saved.length} lock files put back');
+        }
+        if (_cancelled) {
+          stepRecord.status.v = HostCiStepStatus.cancelled.name;
+          continue;
+        }
+        if (step == null ||
+            (blocked &&
+                !(restore &&
+                    _statusOf(run, HostCiStepName.pubDowngrade) !=
+                        HostCiStepStatus.skipped))) {
+          stepRecord.status.v = HostCiStepStatus.skipped.name;
+          continue;
+        }
+        var minVersion = step.minRunCiVersion;
+        if (minVersion != null && !_runCiAtLeast(runCiVersion, minVersion)) {
+          stepRecord.status.v = HostCiStepStatus.skipped.name;
+          _addLine(
+            '# ${step.label} skipped: run_ci $minVersion needed '
+            '($runCiVersion here, dart pub global activate dev_build)',
+          );
+          continue;
+        }
+        if (step == HostCiStepName.pubDowngrade) {
+          savedLockFiles = await hostCiReadLockFiles(path);
+        }
+        _addLine('=== ${step.label} (${index + 1}/${stepRecords.length}) ===');
+        var stepStart = now();
+        stepRecord
+          ..status.v = HostCiStepStatus.running.name
+          ..start.v = stepStart.millisecondsSinceEpoch;
+        await store.putRun(run);
+        _notify();
+        var exitCode = await _runStepProcess(
+          path,
+          'dart',
+          hostCiStepArguments(project, step),
+          stepRecord,
+        );
+        stepRecord
+          ..exitCode.v = exitCode
+          ..duration.v = now().difference(stepStart).inMilliseconds;
+        if (_cancelled) {
+          stepRecord.status.v = HostCiStepStatus.cancelled.name;
+        } else if (exitCode == 0) {
+          stepRecord.status.v = HostCiStepStatus.success.name;
+          stepRecord.failedPackage.clear();
+          stepRecord.failedCommand.clear();
+        } else {
+          stepRecord.status.v = HostCiStepStatus.failure.name;
+          if (stepRecord.isBlockingFailure) {
+            blocked = true;
+          }
+          _addLine(
+            '${step.label} failed (exit code $exitCode)'
+            '${stepRecord.failedPackage.v == null ? '' : ' in ${stepRecord.failedPackage.v}'}'
+            '${stepRecord.isWarning ? ', warning (${stepRecord.severityValue.name})' : ''}'
+            '${stepRecord.isAcceptedFailure ? ', accepted' : ''}',
+            isError: true,
+          );
+        }
+        await store.putRun(run);
+        _notify();
+      }
+    } finally {
+      // Cancelled or thrown during the downgrade: the lock files anyway.
+      if (savedLockFiles != null) {
+        await hostCiRestoreLockFiles(path, savedLockFiles);
+        _addLine('# ${savedLockFiles.length} lock files put back');
+      }
+    }
+    if (_cancelled) {
+      _cancelSteps(run);
+      return;
+    }
+    run.status.v = hostCiRunStatusOfSteps(stepRecords).name;
+    _addLine(
+      '=== ${run.runStatus.name}, ${hostCiFormatDuration(now().difference(run.startDateTime!))} ===',
+    );
+  }
+
+  bool _runCiAtLeast(String version, Version min) {
+    try {
+      return Version.parse(version) >= min;
+    } catch (_) {
+      // Unknown: let it run (and fail if really too old).
+      return true;
+    }
+  }
+
+  HostCiStepStatus? _statusOf(DbHostCiRun run, HostCiStepName name) {
+    for (var step in run.stepList) {
+      if (step.stepName == name) {
+        return step.stepStatus;
+      }
+    }
+    return null;
+  }
+
+  void _cancelSteps(DbHostCiRun run) {
+    run.status.v = HostCiRunStatus.cancelled.name;
+    for (var step in run.stepList) {
+      if (step.stepStatus == HostCiStepStatus.pending ||
+          step.stepStatus == HostCiStepStatus.running) {
+        step.status.v = HostCiStepStatus.cancelled.name;
+      }
+    }
+    _addLine('=== cancelled ===', isError: true);
+  }
+
+  /// Run one step process, the output to the log and the console, the hints
+  /// to [stepRecord]; the exit code (null when it could not start).
+  Future<int?> _runStepProcess(
+    String path,
+    String executable,
+    List<String> arguments,
+    DbHostCiStep stepRecord,
+  ) async {
+    _addLine('$hostCiCommandMarker$executable ${arguments.join(' ')}');
+    HostCiProcess process;
+    try {
+      process = await starter.start(
+        executable,
+        arguments,
+        workingDirectory: path,
+      );
+    } catch (e) {
+      _addLine('$e', isError: true);
+      return null;
+    }
+    _process = process;
+    try {
+      // The package and command running now (the live caption), and the
+      // first failure reported by run_ci.
+      ({String command, String package})? error;
+      void onLine(String line, {bool isError = false}) {
+        if (line.startsWith(hostCiPackageMarker)) {
+          stepRecord.failedPackage.v = line
+              .substring(hostCiPackageMarker.length)
+              .trim();
+          stepRecord.failedCommand.clear();
+          _notify();
+        } else if (line.startsWith(hostCiCommandMarker)) {
+          stepRecord.failedCommand.v = line
+              .substring(hostCiCommandMarker.length)
+              .trim();
+          _notify();
+        } else {
+          error ??= hostCiParseRunCiError(line);
+        }
+        _addLine(line, isError: isError);
+      }
+
+      var outDone = process.stdoutLines.listen(onLine).asFuture<void>();
+      var errDone = process.stderrLines
+          .listen((line) => onLine(line, isError: true))
+          .asFuture<void>();
+      var exitCode = await process.exitCode;
+      await _awaitOutput(outDone, errDone);
+      if (exitCode != 0 && error != null) {
+        // The first failing package, not the last one run.
+        stepRecord
+          ..failedPackage.v = error!.package
+          ..failedCommand.v = error!.command;
+      }
+      return exitCode;
+    } finally {
+      _process = null;
+      _killTimer?.cancel();
+      _killTimer = null;
+    }
+  }
+
+  /// The version printed by `executable arguments`, the first line holding a
+  /// digit (`Dart SDK version: 3.13.7 (stable) ...` gives `3.13.7`), null
+  /// when the command fails.
+  Future<String?> _readVersion(
+    String path,
+    String executable,
+    List<String> arguments,
+  ) async {
+    try {
+      var process = await starter.start(
+        executable,
+        arguments,
+        workingDirectory: path,
+      );
+      _process = process;
+      var out = <String>[];
+      var outDone = process.stdoutLines.listen(out.add).asFuture<void>();
+      var errDone = process.stderrLines.listen(out.add).asFuture<void>();
+      var exitCode = await process.exitCode;
+      await _awaitOutput(outDone, errDone);
+      _process = null;
+      if (exitCode != 0) {
+        for (var line in out) {
+          _addLine(line, isError: true);
+        }
+        return null;
+      }
+      for (var line in out) {
+        var match = RegExp(r'\d+\.\d+[\w.+-]*').firstMatch(line);
+        if (match != null) {
+          return match.group(0);
+        }
+      }
+      return out.isEmpty ? '?' : out.first.trim();
+    } catch (e) {
+      _process = null;
+      _addLine('$e', isError: true);
+      return null;
+    }
+  }
+
+  /// The output ends with the process: wait for the streams, 2 s at most
+  /// (a timer cancelled on the way, nothing left pending).
+  Future<void> _awaitOutput(Future<void> outDone, Future<void> errDone) async {
+    var timeout = Completer<void>();
+    var timer = Timer(const Duration(seconds: 2), timeout.complete);
+    try {
+      await Future.any([
+        Future.wait([outDone, errDone]),
+        timeout.future,
+      ]);
+    } finally {
+      timer.cancel();
+    }
+  }
+
+  /// Kill the running process, the remaining steps are cancelled.
+  void cancel() {
+    if (_cancelled) {
+      return;
+    }
+    _cancelled = true;
+    var process = _process;
+    if (process != null) {
+      process.kill();
+      // Still there after a while: no mercy.
+      _killTimer = Timer(killTimeout, () {
+        if (_process == process) {
+          process.kill(force: true);
+        }
+      });
+    }
+  }
+
+  /// `<id segments>/<key>.log`, the id segments made file name safe.
+  String _logRelativePath(DbHostCiRun run) {
+    var segments = project.id
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .map((segment) => segment.replaceAll(RegExp(r'[^\w.-]'), '_'))
+        .toList();
+    return p.joinAll([...segments, '${run.id}.log']);
+  }
+
+  Future<void> _openLog(DbHostCiRun run) async {
+    var file = File(p.join(logsDir, run.log.v!));
+    await file.parent.create(recursive: true);
+    _logSink = file.openWrite();
+    _logSink!.writeln(
+      '# host ci run ${run.id}, ${project.id}, ${project.path.v}, '
+      '${run.startDateTime!.toIso8601String()}, trigger ${trigger.name}'
+      '${client == null ? '' : ', $client'}',
+    );
+  }
+
+  Future<void> _closeLog() async {
+    var sink = _logSink;
+    _logSink = null;
+    if (sink != null) {
+      try {
+        await sink.flush();
+        await sink.close();
+      } catch (_) {
+        // The disk is full, the folder is gone: the record is what matters.
+      }
+    }
+  }
+
+  Future<void> _applyRetention(DbHostCiRun run) async {
+    try {
+      var removed = await store.applyLogRetention(
+        project.id,
+        logsKept: settings.logsKeptValue,
+      );
+      for (var relativePath in removed) {
+        var file = File(p.join(logsDir, relativePath));
+        if (file.existsSync()) {
+          await file.delete();
+        }
+      }
+    } catch (_) {
+      // Best effort.
+    }
+  }
+
+  void _notify() {
+    var run = _run;
+    if (run != null) {
+      onRun?.call(run);
+    }
+  }
+
+  void _addLine(String text, {bool isError = false}) {
+    _logSink?.writeln(isError ? '! $text' : text);
+    if (onLines == null) {
+      return;
+    }
+    _pendingLines.add(HostCiOutputLine(text, isError: isError));
+    _flushTimer ??= Timer(flushDelay, _flush);
+  }
+
+  void _flush() {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    if (_pendingLines.isEmpty) {
+      return;
+    }
+    var lines = List<HostCiOutputLine>.from(_pendingLines);
+    _pendingLines.clear();
+    onLines?.call(lines);
+  }
+}
+
+/// The status of a run from its [steps]: failure when a step failed with
+/// the fail policy, warning when only warnings, success otherwise.
+HostCiRunStatus hostCiRunStatusOfSteps(List<DbHostCiStep> steps) {
+  if (steps.any((step) => step.isBlockingFailure)) {
+    return HostCiRunStatus.failure;
+  }
+  if (steps.any((step) => step.isWarning)) {
+    return HostCiRunStatus.warning;
+  }
+  return HostCiRunStatus.success;
+}
+
+/// Read the log of [run] from [logsDir], empty when the file is gone.
+///
+/// The runner prefixes the stderr lines with `! `, they are flagged back.
+Future<List<HostCiOutputLine>> hostCiReadLog(
+  String logsDir,
+  DbHostCiRun run,
+) async {
+  var relativePath = run.log.v;
+  if (relativePath == null) {
+    return const [];
+  }
+  var file = File(p.join(logsDir, relativePath));
+  if (!file.existsSync()) {
+    return const [];
+  }
+  var lines = await file.readAsLines();
+  return lines.map((line) {
+    if (line.startsWith('! ')) {
+      return HostCiOutputLine(line.substring(2), isError: true);
+    }
+    return HostCiOutputLine(line);
+  }).toList();
+}
+
+/// The step header lines of a log: `=== <label> (n/N) ===`.
+final _hostCiStepHeader = RegExp(r'^=== (.+) \((\d+)/(\d+)\) ===$');
+
+/// A section of a log: the lines of one step, or the lines before the first
+/// step (the git facts, the tool versions) when [step] is null.
+class HostCiLogSection {
+  /// The step, null for the lines before the first step.
+  final HostCiStepName? step;
+
+  /// The step label, `run` before the first step.
+  final String title;
+
+  /// The lines, the header included.
+  final List<HostCiOutputLine> lines;
+
+  /// Creates a section.
+  HostCiLogSection({
+    required this.step,
+    required this.title,
+    required this.lines,
+  });
+
+  @override
+  String toString() => '$title (${lines.length})';
+}
+
+/// Split the lines of a log by step, in order (the empty sections dropped).
+List<HostCiLogSection> hostCiLogSections(List<HostCiOutputLine> lines) {
+  var sections = <HostCiLogSection>[];
+  var current = HostCiLogSection(step: null, title: 'run', lines: []);
+  sections.add(current);
+  for (var line in lines) {
+    var match = _hostCiStepHeader.firstMatch(line.text);
+    if (match != null) {
+      var label = match.group(1)!;
+      HostCiStepName? step;
+      for (var value in HostCiStepName.values) {
+        if (value.label == label) {
+          step = value;
+        }
+      }
+      current = HostCiLogSection(step: step, title: label, lines: []);
+      sections.add(current);
+    }
+    current.lines.add(line);
+  }
+  return sections.where((section) => section.lines.isNotEmpty).toList();
+}

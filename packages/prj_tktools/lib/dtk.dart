@@ -2,6 +2,7 @@
 library;
 
 export 'src/bin/dtk.dart' show DtkCommand, dtkMain;
+export 'src/bin/dtk_ci.dart' show DtkCiCommand;
 export 'src/dtk/dtk.dart'
     show
         dtkGitExportPathGlobalPrefsKey,
