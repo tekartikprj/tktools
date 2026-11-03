@@ -89,10 +89,19 @@ void main() {
       'pub global run dev_build:run_ci --pub-downgrade --no-override '
       '--recursive',
     );
+    // run_ci 1.1.17 has no --no-fatal-warnings: dropped, said.
     expect(
       argsOf(HostCiStepName.analyzeDowngrade),
       'pub global run dev_build:run_ci --analyze --no-pub-get --no-override '
       '--recursive',
+    );
+    expect(
+      lines.map((line) => line.text),
+      contains(
+        '# run_ci 1.1.17 has no --no-fatal-warnings (1.1.17+3): the warnings '
+        'of the analyze downgrade are fatal, update it: dart pub global '
+        'activate dev_build',
+      ),
     );
     expect(
       argsOf(HostCiStepName.pubRestore),
@@ -111,6 +120,34 @@ void main() {
     expect(lines.map((line) => line.text), contains('=== format (3/10) ==='));
     // The slot is given back.
     expect((await hostCi!.getQueue()).isEmpty, isTrue);
+  });
+
+  test('analyze downgrade: errors only from run_ci 1.1.17+3', () async {
+    var starter = fakeStarter(runCiVersion: '1.1.17+3');
+    var lines = <HostCiOutputLine>[];
+    var run = await runOnce(starter, lines: lines);
+    expect(run.runStatus, HostCiRunStatus.success);
+    expect(startedSteps(starter), defaultSteps);
+    expect(
+      starter.starts
+          .firstWhere(
+            (start) =>
+                stepOfArguments(start.arguments) ==
+                HostCiStepName.analyzeDowngrade,
+          )
+          .arguments
+          .join(' '),
+      'pub global run dev_build:run_ci --analyze --no-pub-get --no-override '
+      '--no-fatal-warnings --recursive',
+    );
+    expect(
+      lines.map((line) => line.text),
+      isNot(contains(startsWith('# run_ci 1.1.17+3 has no'))),
+    );
+    expect(hostCiRunCiHasNoFatalWarnings('1.1.17+2'), isFalse);
+    expect(hostCiRunCiHasNoFatalWarnings('1.1.15'), isFalse);
+    expect(hostCiRunCiHasNoFatalWarnings('1.1.18'), isTrue);
+    expect(hostCiRunCiHasNoFatalWarnings(null), isTrue);
   });
 
   test('a red step skips the following ones', () async {

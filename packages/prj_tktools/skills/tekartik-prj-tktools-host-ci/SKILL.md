@@ -54,6 +54,9 @@ and read everything.
   (`--platform host|web`: its test and build steps).
 - The run happens on the checkout as it is (dirty trees run, flagged): pub
   upgrade rewrites the lock files, the downgrade puts them back.
+- The downgrade analyze fails on errors only (`run_ci --no-fatal-warnings`,
+  dev_build 1.1.17+3; an older `run_ci` makes its warnings fatal, the log
+  says so).
 - `build host` is not a `run_ci` step: Host CI runs `flutter build <host>
   --no-pub` in each flutter package with the platform folder (`linux`,
   `macos`, `windows`) and `lib/main.dart`, all of them even after a failure;

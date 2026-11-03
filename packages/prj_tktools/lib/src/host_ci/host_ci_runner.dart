@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dev_build/package.dart' show recursivePubPath;
 import 'package:path/path.dart' as p;
+import 'package:pub_semver/pub_semver.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_git.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_model.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_process.dart';
@@ -50,22 +51,44 @@ const hostCiRunCiPackage = 'dev_build:run_ci';
   return (command: match.group(1)!.trim(), package: match.group(2)!.trim());
 }
 
+/// The first `run_ci` (dev_build) knowing [hostCiNoFatalWarningsArg].
+final hostCiRunCiNoFatalWarningsVersion = Version(1, 1, 17, build: '3');
+
+/// True when `run_ci` [version] knows [hostCiNoFatalWarningsArg] (unknown or
+/// unreadable: assumed recent).
+bool hostCiRunCiHasNoFatalWarnings(String? version) {
+  if (version == null) {
+    return true;
+  }
+  try {
+    return Version.parse(version) >= hostCiRunCiNoFatalWarningsVersion;
+  } catch (_) {
+    return true;
+  }
+}
+
 /// The `dart` arguments of a `run_ci` step of [project] (not
 /// [HostCiStepName.buildHost], see [hostCiHostBuildArguments]): `pub global
 /// run dev_build:run_ci`, the step arguments, `--recursive` and the project
-/// extra arguments.
+/// extra arguments. [runCiVersion], when known, drops the arguments an older
+/// `run_ci` does not know.
 List<String> hostCiStepArguments(
   DbHostCiProject project,
-  HostCiStepName step,
-) => [
-  'pub',
-  'global',
-  'run',
-  hostCiRunCiPackage,
-  ...step.runCiArguments,
-  '--recursive',
-  ...?project.extraArgs.v,
-];
+  HostCiStepName step, {
+  String? runCiVersion,
+}) {
+  var noFatalWarnings = hostCiRunCiHasNoFatalWarnings(runCiVersion);
+  return [
+    'pub',
+    'global',
+    'run',
+    hostCiRunCiPackage,
+    for (var arg in step.runCiArguments)
+      if (noFatalWarnings || arg != hostCiNoFatalWarningsArg) arg,
+    '--recursive',
+    ...?project.extraArgs.v,
+  ];
+}
 
 /// The command of a step of [project] as the reports show it:
 /// `dart pub global run dev_build:run_ci ...` ([hostCiStepArguments]),
@@ -98,23 +121,18 @@ HostCiStepName? hostCiStepOfArguments(List<String> arguments) {
     return null;
   }
   var rest = arguments.sublist(index + 1);
+  var recursiveIndex = rest.indexOf('--recursive');
+  if (recursiveIndex < 0) {
+    return null;
+  }
+  // With or without the arguments dropped for an older run_ci.
+  List<String> known(List<String> arguments) =>
+      arguments.where((arg) => arg != hostCiNoFatalWarningsArg).toList();
+  var stepArguments = known(rest.sublist(0, recursiveIndex));
   for (var step in HostCiStepName.values) {
-    if (!step.isRunCi) {
-      continue;
-    }
-    var stepArguments = step.runCiArguments;
-    if (rest.length > stepArguments.length &&
-        rest[stepArguments.length] == '--recursive') {
-      var same = true;
-      for (var i = 0; i < stepArguments.length; i++) {
-        if (rest[i] != stepArguments[i]) {
-          same = false;
-          break;
-        }
-      }
-      if (same) {
-        return step;
-      }
+    if (step.isRunCi &&
+        _sameArguments(stepArguments, known(step.runCiArguments))) {
+      return step;
     }
   }
   return null;
@@ -513,6 +531,16 @@ class HostCiRunner {
       '${run.flutterVersion.v == null ? '' : ', flutter ${run.flutterVersion.v}'}'
       ', run_ci $runCiVersion',
     );
+    if (!hostCiRunCiHasNoFatalWarnings(runCiVersion) &&
+        stepRecords.any(
+          (step) => step.stepName == HostCiStepName.analyzeDowngrade,
+        )) {
+      _addLine(
+        '# run_ci $runCiVersion has no $hostCiNoFatalWarningsArg '
+        '($hostCiRunCiNoFatalWarningsVersion): the warnings of the analyze '
+        'downgrade are fatal, update it: dart pub global activate dev_build',
+      );
+    }
     await store.putRun(run);
     _notify();
 
@@ -557,7 +585,7 @@ class HostCiRunner {
             ? await _runStepProcess(
                 path,
                 'dart',
-                hostCiStepArguments(project, step),
+                hostCiStepArguments(project, step, runCiVersion: runCiVersion),
                 stepRecord,
               )
             : step == HostCiStepName.update

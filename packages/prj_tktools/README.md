@@ -47,7 +47,7 @@ previous ones (a failing step skips the next ones).
 | test web | `--test --no-vm-test --no-pub-get` (chrome, node) |
 | build web | `--build --no-pub-get` |
 | build host | not `run_ci`: Host CI runs `flutter build linux` (`macos`, `windows`) `--no-pub` in each flutter app having the platform folder and `lib/main.dart` |
-| pub downgrade, analyze downgrade, pub restore | `--pub-downgrade`, `--analyze` on the lowest versions, then the lock files put back and `--pub-get` |
+| pub downgrade, analyze downgrade, pub restore | `--pub-downgrade`, `--analyze --no-fatal-warnings` on the lowest versions (errors only: their warnings are reported, the analyze step checks the latest ones; `run_ci` 1.1.17+3, the flag dropped for an older one), then the lock files put back and `--pub-get` |
 
 ```bash
 dtk ci add [<path|owner/repo>...]       # follow checkouts (the current folder)

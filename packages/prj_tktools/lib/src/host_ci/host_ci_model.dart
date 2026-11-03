@@ -49,7 +49,9 @@ enum HostCiStepName {
   /// constraints, the lock files are saved before.
   pubDowngrade,
 
-  /// `run_ci --analyze` on the downgraded dependencies.
+  /// `run_ci --analyze --no-fatal-warnings` on the downgraded dependencies:
+  /// errors only, the warnings and the infos of the lowest versions are
+  /// reported (the analyze step checks them on the latest ones).
   analyzeDowngrade,
 
   /// The lock files saved before [pubDowngrade] put back, then
@@ -72,6 +74,10 @@ const hostCiSelectableSteps = [
 
 /// The steps whose failure policy can be set (the pub steps always fail).
 const hostCiPolicySteps = hostCiSelectableSteps;
+
+/// The `run_ci` flag of [HostCiStepName.analyzeDowngrade]: analyze fails on
+/// errors only (`run_ci` 1.1.17+3, dropped for an older one).
+const hostCiNoFatalWarningsArg = '--no-fatal-warnings';
 
 /// The steps that run together: the downgrade, its analyze and the restore.
 const hostCiDowngradeSteps = [
@@ -127,6 +133,7 @@ extension HostCiStepNameExt on HostCiStepName {
       '--analyze',
       '--no-pub-get',
       '--no-override',
+      hostCiNoFatalWarningsArg,
     ],
     HostCiStepName.pubRestore => ['--pub-get', '--no-override'],
   };

@@ -91,37 +91,8 @@ Future<String> commit(String path, String message) async {
 
 /// The step of a `dart pub global run dev_build:run_ci ...` command (or of a
 /// host build `flutter build <host> --no-pub`), null for another command.
-HostCiStepName? stepOfArguments(List<String> arguments) {
-  if (hostCiStepOfArguments(arguments) == HostCiStepName.buildHost) {
-    return HostCiStepName.buildHost;
-  }
-  var index = arguments.indexOf(hostCiRunCiPackage);
-  if (index < 0) {
-    return null;
-  }
-  var rest = arguments.sublist(index + 1);
-  for (var step in HostCiStepName.values) {
-    var stepArgs = step.runCiArguments;
-    if (rest.length >= stepArgs.length + 1 &&
-        _listEquals(rest.sublist(0, stepArgs.length), stepArgs) &&
-        rest[stepArgs.length] == '--recursive') {
-      return step;
-    }
-  }
-  return null;
-}
-
-bool _listEquals(List<String> a, List<String> b) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
+HostCiStepName? stepOfArguments(List<String> arguments) =>
+    hostCiStepOfArguments(arguments);
 
 /// A fake starter scripting the tool versions and one process per step.
 ///
