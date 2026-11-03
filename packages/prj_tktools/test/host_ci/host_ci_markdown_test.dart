@@ -132,11 +132,33 @@ void main() {
         '  Expected: <200>',
         '    Actual: <404>',
         '00:06 +300 -2: Some tests failed.',
+        // The output written again by run_ci on failure: not new failures.
+        '! ERROR ShellException(dart test, exitCode 1, workingDirectory: .)',
+        '! out: 00:00 +0: loading test/a_test.dart',
+        '! 00:05 +300 -1: test/a_test.dart: first [E]',
+        '!   Expected: <200>',
+        '!     Actual: <404>',
+        '! 00:05 +300 -2: test/a_test.dart: second [E]',
+        '!   Expected: <200>',
+        '!     Actual: <404>',
+        '! 00:06 +300 -2: Some tests failed.',
       ]),
       now: DateTime(2026, 11, 3, 11),
       maxLines: 50,
     );
     expect(markdown, contains('Failing tests (2, in the order they failed):'));
+    // The run_ci echo: not listed again, its errors not written again.
+    expect(
+      markdown,
+      contains(
+        '- test/a_test.dart: first\n- test/a_test.dart: second\n\nTheir errors',
+      ),
+    );
+    var errors = markdown.substring(
+      markdown.indexOf('Their errors'),
+      markdown.indexOf('End of the log'),
+    );
+    expect(RegExp(r'second \[E\]').allMatches(errors), hasLength(1));
     expect(markdown, contains('- test/a_test.dart: first\n'));
     expect(
       markdown,

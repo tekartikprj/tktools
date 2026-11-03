@@ -330,13 +330,19 @@ final _testProgress = RegExp(r'^\d+:\d+ \+\d+');
 
 /// The failing tests of a test log: each `[E]` progress line with the lines
 /// that follow it (the error, the stack) up to the next progress line.
+///
+/// The same `[E]` line again (its counters included) is the test output
+/// written once more by run_ci when the command fails (`out:` of its
+/// ShellException): kept once.
 List<List<HostCiOutputLine>> _testFailures(List<HostCiOutputLine> lines) {
   var blocks = <List<HostCiOutputLine>>[];
+  var seen = <String>{};
   List<HostCiOutputLine>? current;
   for (var line in lines) {
     if (_testProgress.hasMatch(line.text)) {
       current = null;
-      if (line.text.trimRight().endsWith('[E]')) {
+      var text = line.text.trimRight();
+      if (text.endsWith('[E]') && seen.add(text)) {
         current = [line];
         blocks.add(current);
       }
