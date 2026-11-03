@@ -371,6 +371,11 @@ void main() {
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen(output.add);
+      // The errors too, named: they explain an exit code.
+      process.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) => output.add('$name! $line'));
       return process;
     }
 
@@ -397,9 +402,9 @@ void main() {
     expect(state.running!.project, 'first');
     expect(state.waiting.map((entry) => entry.project), ['second', 'third']);
     File(release).writeAsStringSync('');
-    expect(await first.exitCode, 0);
-    expect(await second.exitCode, 0);
-    expect(await third.exitCode, 0);
+    expect(await first.exitCode, 0, reason: '$output');
+    expect(await second.exitCode, 0, reason: '$output');
+    expect(await third.exitCode, 0, reason: '$output');
     expect(output.where((line) => line.endsWith('acquired')), [
       'first acquired',
       'second acquired',
@@ -416,7 +421,7 @@ void main() {
     await until(() async => (await queue.readState()).waiting.length == 1);
     expect(output, isNot(contains('after acquired')));
     killed.kill(ProcessSignal.sigkill);
-    expect(await after.exitCode, 0);
+    expect(await after.exitCode, 0, reason: '$output');
     expect(output, contains('after acquired'));
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

@@ -341,11 +341,36 @@ class HostCiRunQueue {
     }
   }
 
+  /// Written next to it then renamed (never read half written). On Windows
+  /// a file open elsewhere cannot be replaced (the previous running file,
+  /// just written, held by an antivirus scan): the rename is retried, then
+  /// the file written in place. It never fails the run: the run lock holds
+  /// the slot, the running file only describes it.
   Future<void> _writeRunning(HostCiQueueEntry entry) async {
     var file = File(runningPath);
+    var content = jsonEncode(entry.toJson());
     var tmp = File('$runningPath.$pid.tmp');
-    await tmp.writeAsString(jsonEncode(entry.toJson()), flush: true);
-    await tmp.rename(file.path);
+    try {
+      await tmp.writeAsString(content, flush: true);
+      for (var attempt = 1; ; attempt++) {
+        try {
+          await tmp.rename(file.path);
+          return;
+        } on FileSystemException {
+          if (attempt >= 10) {
+            rethrow;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+      }
+    } catch (_) {
+      try {
+        await tmp.delete();
+      } catch (_) {}
+      try {
+        await file.writeAsString(content, flush: true);
+      } catch (_) {}
+    }
   }
 
   Future<void> _release(HostCiRunSlot slot) async {
@@ -405,8 +430,10 @@ class HostCiRunQueue {
           : await _tryLock(file, start: _ticketLockStart, end: _ticketLockEnd);
       var dead = ownerPid == pid || probe != null;
       if (probe != null) {
-        await probe.unlock();
-        await probe.close();
+        try {
+          await probe.unlock();
+          await probe.close();
+        } catch (_) {}
       }
       if (dead) {
         try {

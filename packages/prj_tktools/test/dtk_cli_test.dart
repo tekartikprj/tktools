@@ -13,18 +13,20 @@ import 'package:tekartik_prj_tktools/src/dtk/dtk_git_config_db.dart'
 import 'package:test/test.dart';
 
 import 'src/dtk_test_tree.dart';
+import 'src/test_kernel.dart';
 
 /// dtk command line tests, run as a sub process on a temp git tree, with the
 /// user prefs in a temp folder (TEKARTIK_PROCESS_RUN_USER_APP_DATA_PATH).
 void main() {
   late DtkTestTree tree;
-  var cliScript = absolute(join('test', 'src', 'dtk_cli_main.dart'));
+  // Compiled once: each call starts fast.
+  late String cliProgram;
 
   Future<ProcessResult> dtk(List<String> arguments) {
     return Process.run(
       Platform.resolvedExecutable,
       [
-        cliScript,
+        cliProgram,
         '--git-top=${tree.gitTop}',
         '--git-config-export-path=${tree.gitExport}',
         '--pub-config-export-path=${tree.pubExport}',
@@ -42,6 +44,10 @@ void main() {
 
   setUpAll(() async {
     tree = await DtkTestTree.create();
+    cliProgram = await compileTestScript(
+      absolute(join('test', 'src', 'dtk_cli_main.dart')),
+      tree.tmp.path,
+    );
   });
 
   tearDownAll(() async {
