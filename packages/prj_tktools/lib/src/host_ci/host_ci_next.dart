@@ -236,3 +236,22 @@ List<HostCiProjectStatus> hostCiSortStatuses(
   });
   return sorted;
 }
+
+/// Order the statuses by their last completed run, the oldest first
+/// whatever the bucket (the start of the run the list shows, the never run
+/// ones first): the projects not checked for the longest time.
+List<HostCiProjectStatus> hostCiSortStatusesByOldestRun(
+  List<HostCiProjectStatus> statuses,
+) {
+  var sorted = List<HostCiProjectStatus>.from(statuses);
+  sorted.sort((a, b) {
+    var cmp = (a.lastCompletedRun?.start.v ?? 0).compareTo(
+      b.lastCompletedRun?.start.v ?? 0,
+    );
+    if (cmp != 0) {
+      return cmp;
+    }
+    return a.project.id.compareTo(b.project.id);
+  });
+  return sorted;
+}

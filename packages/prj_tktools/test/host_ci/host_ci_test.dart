@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:tekartik_app_cv_sdb/app_cv_sdb.dart';
 import 'package:tekartik_prj_tktools/host_ci.dart';
 import 'package:test/test.dart';
 
@@ -99,6 +100,35 @@ void main() {
           HostCiStepName.testWeb,
           ...hostCiDowngradeSteps,
         ],
+      );
+    });
+
+    test('hostCiSortStatusesByOldestRun', () {
+      initCvHostCi();
+      HostCiProjectStatus status(String id, int? start, HostCiBucket bucket) =>
+          HostCiProjectStatus(
+            project: hostCiProjectStore.record(id).cv(),
+            lastRun: null,
+            lastCompletedRun: start == null
+                ? null
+                : (DbHostCiRun()..start.v = start),
+            git: null,
+            commitsSince: null,
+            bucket: bucket,
+            reason: '',
+          );
+      var statuses = [
+        status('red', 3000, HostCiBucket.red),
+        status('fresh', 1000, HostCiBucket.fresh),
+        status('b-never', null, HostCiBucket.neverRun),
+        status('a-never', null, HostCiBucket.neverRun),
+        status('paused', 2000, HostCiBucket.paused),
+      ];
+      expect(
+        hostCiSortStatusesByOldestRun(
+          statuses,
+        ).map((status) => status.project.id),
+        ['a-never', 'b-never', 'fresh', 'paused', 'red'],
       );
     });
 
