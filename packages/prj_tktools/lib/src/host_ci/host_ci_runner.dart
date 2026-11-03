@@ -151,7 +151,8 @@ List<String> hostCiHostBuildArguments(String platform) => [
 /// The flutter apps below [root] to build for [platform]: the packages
 /// depending on flutter (found like `run_ci` finds them) that have a
 /// `<platform>` folder and `lib/main.dart`; their paths relative to [root]
-/// (`.` for [root] itself), sorted.
+/// with `/` separators on every platform (`flutter_app/example`, `.` for
+/// [root] itself), sorted.
 Future<List<String>> hostCiHostBuildPackages(
   String root,
   String platform,
@@ -164,7 +165,8 @@ Future<List<String>> hostCiHostBuildPackages(
     var dir = p.normalize(p.absolute(root, package));
     if (Directory(p.join(dir, platform)).existsSync() &&
         File(p.join(dir, 'lib', 'main.dart')).existsSync()) {
-      apps.add(p.relative(dir, from: p.normalize(p.absolute(root))));
+      var relative = p.relative(dir, from: p.normalize(p.absolute(root)));
+      apps.add(p.posix.joinAll(p.split(relative)));
     }
   }
   apps.sort();
