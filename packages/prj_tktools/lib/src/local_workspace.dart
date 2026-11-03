@@ -115,8 +115,8 @@ String _githubRelPath(String gitUrl) {
 /// Write [content] to [file] only if it differs from the existing content.
 ///
 /// Reports what happened on stdout (`Created`, `Updated` or `No changes
-/// needed for`).
-void localWorkspaceWriteFileIfChanged(File file, String content) {
+/// needed for`), returns true when the file was created or updated.
+bool localWorkspaceWriteFileIfChanged(File file, String content) {
   if (file.existsSync()) {
     String? existing;
     try {
@@ -124,14 +124,41 @@ void localWorkspaceWriteFileIfChanged(File file, String content) {
     } catch (_) {}
     if (existing == content) {
       stdout.writeln('No changes needed for ${file.path}');
-      return;
+      return false;
     }
     file.writeAsStringSync(content);
     stdout.writeln('Updated ${file.path}');
-    return;
+    return true;
   }
   file.writeAsStringSync(content);
   stdout.writeln('Created ${file.path}');
+  return true;
+}
+
+/// Why IntelliJ may have the project of the `.idea` folder [ideaDirPath]
+/// open, null when nothing shows it.
+///
+/// IntelliJ reads `.idea/modules.xml` and the module files only when it
+/// opens a project and writes its own module over them when it closes it:
+/// files written while the project is open are ignored, then lost.
+///
+/// The signs: a `workspace.xml` without `modules.xml` (IntelliJ opened the
+/// folder before any setup) or a JetBrains terminal (`TERMINAL_EMULATOR` in
+/// [environment], [Platform.environment] by default).
+String? localWorkspaceIdeaOpenReason(
+  String ideaDirPath, {
+  Map<String, String>? environment,
+}) {
+  if (File(join(ideaDirPath, 'workspace.xml')).existsSync() &&
+      !File(join(ideaDirPath, 'modules.xml')).existsSync()) {
+    return '.idea/workspace.xml exists without .idea/modules.xml';
+  }
+  environment ??= Platform.environment;
+  var terminal = environment['TERMINAL_EMULATOR'];
+  if (terminal != null && terminal.startsWith('JetBrains')) {
+    return 'running in a JetBrains terminal';
+  }
+  return null;
 }
 
 /// Create (replacing any existing) a symlink at [absoluteLinkPath] pointing to
@@ -594,6 +621,8 @@ class LocalWorkspaceHelper {
     var ideaProjectDir = parentFolder ?? absolutePath;
     var dirName = basename(ideaProjectDir);
     var ideaDir = Directory(join(ideaProjectDir, '.idea'));
+    // Before writing, modules.xml is one of the signs.
+    var ideaOpenReason = localWorkspaceIdeaOpenReason(ideaDir.path);
     if (!ideaDir.existsSync()) {
       ideaDir.createSync(recursive: true);
     }
@@ -674,8 +703,19 @@ ${contentEntries.toString().trimRight()}
   </component>
 </module>
 ''';
-    localWorkspaceWriteFileIfChanged(imlFile, imlContent);
-    localWorkspaceWriteFileIfChanged(modulesFile, modulesContent);
+    var imlChanged = localWorkspaceWriteFileIfChanged(imlFile, imlContent);
+    var modulesChanged = localWorkspaceWriteFileIfChanged(
+      modulesFile,
+      modulesContent,
+    );
+    if ((imlChanged || modulesChanged) && ideaOpenReason != null) {
+      stderr.writeln('''
+Warning: IntelliJ may have this project open ($ideaOpenReason).
+IntelliJ reads .idea/modules.xml and .idea/$dirName.iml only when it opens
+the project, and writes its own module over them when it closes it.
+If folders are missing in IntelliJ: close the project, run
+`lw setup-idea` again from a terminal outside IntelliJ, then reopen it.''');
+    }
   }
 
   /// Update `.claude/settings.json` with the resolved folders added to
