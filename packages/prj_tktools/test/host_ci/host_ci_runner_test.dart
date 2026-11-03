@@ -19,7 +19,11 @@ void main() {
     topDir = newTempDir('runner');
     repoPath = p.join(topDir.path, 'repo');
     ciDir = p.join(topDir.path, 'host_ci');
-    await createGitRepo(repoPath, remote: 'git@github.com:owner/repo.git');
+    await createGitRepo(
+      repoPath,
+      remote: 'git@github.com:owner/repo.git',
+      flutterApp: true,
+    );
   });
 
   tearDown(() async {
@@ -343,21 +347,94 @@ void main() {
     expect(run.runStatus, HostCiRunStatus.success);
   });
 
-  test('build host needs run_ci 1.1.17', () async {
-    var starter = fakeStarter(runCiVersion: '1.1.16');
-    var lines = <HostCiOutputLine>[];
-    var run = await runOnce(starter, lines: lines);
-    expect(run.runStatus, HostCiRunStatus.success);
-    expect(startedSteps(starter), [
-      for (var step in defaultSteps)
-        if (step != HostCiStepName.buildHost) step,
-    ]);
-    expect(run.stepList[6].stepName, HostCiStepName.buildHost);
-    expect(run.stepList[6].stepStatus, HostCiStepStatus.skipped);
-    expect(
-      lines.map((line) => line.text),
-      contains(startsWith('# build host skipped: run_ci 1.1.17 needed')),
-    );
+  group('build host', () {
+    var platform = hostCiHostBuildPlatform!;
+
+    test('packages', () async {
+      var root = p.join(topDir.path, 'packages');
+      createFlutterApp(root);
+      createFlutterApp(p.join(root, 'example'));
+      createFlutterApp(p.join(root, 'packages', 'no_main'), main: false);
+      createFlutterApp(p.join(root, 'packages', 'no_platform'), platforms: []);
+      createFlutterApp(p.join(root, 'packages', 'dart_only'), flutter: false);
+      // Never searched, like run_ci: the test, build and hidden folders.
+      createFlutterApp(p.join(root, 'test', 'fixture'));
+      createFlutterApp(p.join(root, 'build', 'app'));
+      createFlutterApp(p.join(root, '.hidden', 'app'));
+      expect(await hostCiHostBuildPackages(root, platform), ['.', 'example']);
+      expect(hostCiHostBuildArguments(platform), [
+        'build',
+        platform,
+        '--no-pub',
+      ]);
+      expect(
+        hostCiStepOfArguments(hostCiHostBuildArguments(platform)),
+        HostCiStepName.buildHost,
+      );
+    });
+
+    test('flutter build in each flutter app, all after a failure', () async {
+      createFlutterApp(p.join(repoPath, 'flutter_app', 'example'));
+      var builds = 0;
+      var starter = fakeStarter(
+        steps: {
+          // The first app fails, the second one still builds.
+          HostCiStepName.buildHost: () => ++builds == 1
+              ? HostCiFakeProcess(err: ['Build process failed'], exitCode: 1)
+              : HostCiFakeProcess(out: ['built'], exitCode: 0),
+        },
+      );
+      var lines = <HostCiOutputLine>[];
+      var run = await runOnce(
+        starter,
+        lines: lines,
+        options: (project) => project.setPolicy(
+          HostCiStepName.buildHost,
+          HostCiFailurePolicy.warn,
+        ),
+      );
+      expect(run.runStatus, HostCiRunStatus.warning);
+      var hostBuilds = starter.starts
+          .where((start) => start.executable == 'flutter')
+          .toList();
+      expect(hostBuilds.map((start) => start.workingDirectory), [
+        p.join(repoPath, 'flutter_app'),
+        p.join(repoPath, 'flutter_app', 'example'),
+      ]);
+      expect(hostBuilds.first.arguments, ['build', platform, '--no-pub']);
+      var step = run.stepList[6];
+      expect(step.stepName, HostCiStepName.buildHost);
+      expect(step.stepStatus, HostCiStepStatus.failure);
+      expect(step.exitCode.v, 1);
+      expect(step.failedPackage.v, 'flutter_app');
+      expect(step.failedCommand.v, 'flutter build $platform --no-pub');
+      expect(
+        lines.map((line) => line.text),
+        containsAllInOrder([
+          '=== build host (7/10) ===',
+          '# package: flutter_app',
+          '\$ flutter build $platform --no-pub',
+          '# package: flutter_app/example',
+        ]),
+      );
+    });
+
+    test('nothing to build', () async {
+      File(p.join(repoPath, 'flutter_app', 'lib', 'main.dart')).deleteSync();
+      var starter = fakeStarter();
+      var lines = <HostCiOutputLine>[];
+      var run = await runOnce(starter, lines: lines);
+      expect(run.runStatus, HostCiRunStatus.success);
+      expect(startedSteps(starter), [
+        for (var step in defaultSteps)
+          if (step != HostCiStepName.buildHost) step,
+      ]);
+      expect(run.stepList[6].stepStatus, HostCiStepStatus.success);
+      expect(
+        lines.map((line) => line.text),
+        contains('# no flutter app with $platform/ and lib/main.dart'),
+      );
+    });
   });
 
   test('retry: only a step, from a step', () async {

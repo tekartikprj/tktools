@@ -33,15 +33,49 @@ Future<String> git(String path, List<String> args) async {
 }
 
 /// Create a git repository at [path] with one commit, an `origin` remote when
-/// [remote] is given.
-Future<void> createGitRepo(String path, {String? remote}) async {
+/// [remote] is given, a flutter app in `flutter_app` when [flutterApp] is
+/// true (one host build).
+Future<void> createGitRepo(
+  String path, {
+  String? remote,
+  bool flutterApp = false,
+}) async {
   Directory(path).createSync(recursive: true);
   await git(path, ['init', '-q', '-b', 'main']);
   File(p.join(path, 'README.md')).writeAsStringSync('# test\n');
+  if (flutterApp) {
+    createFlutterApp(p.join(path, 'flutter_app'));
+  }
   await git(path, ['add', '.']);
   await git(path, ['commit', '-q', '-m', 'first']);
   if (remote != null) {
     await git(path, ['remote', 'add', 'origin', remote]);
+  }
+}
+
+/// A flutter app at [path] that Host CI builds for the host: a pubspec
+/// depending on flutter, `lib/main.dart` and the platform folders (a
+/// `.gitkeep` in each), [platforms] all of them by default.
+void createFlutterApp(
+  String path, {
+  List<String> platforms = hostCiHostBuildPlatforms,
+  bool main = true,
+  bool flutter = true,
+}) {
+  Directory(path).createSync(recursive: true);
+  File(p.join(path, 'pubspec.yaml')).writeAsStringSync(
+    'name: ${p.basename(path)}\n'
+    'environment:\n'
+    '  sdk: ^3.12.0\n'
+    '${flutter ? 'dependencies:\n  flutter:\n    sdk: flutter\n' : ''}',
+  );
+  if (main) {
+    File(p.join(path, 'lib', 'main.dart'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('void main() {}\n');
+  }
+  for (var platform in platforms) {
+    File(p.join(path, platform, '.gitkeep')).createSync(recursive: true);
   }
 }
 
@@ -55,9 +89,12 @@ Future<String> commit(String path, String message) async {
   return await git(path, ['rev-parse', 'HEAD']);
 }
 
-/// The step of a `dart pub global run dev_build:run_ci ...` command, null
-/// for another command.
+/// The step of a `dart pub global run dev_build:run_ci ...` command (or of a
+/// host build `flutter build <host> --no-pub`), null for another command.
 HostCiStepName? stepOfArguments(List<String> arguments) {
+  if (hostCiStepOfArguments(arguments) == HostCiStepName.buildHost) {
+    return HostCiStepName.buildHost;
+  }
   var index = arguments.indexOf(hostCiRunCiPackage);
   if (index < 0) {
     return null;

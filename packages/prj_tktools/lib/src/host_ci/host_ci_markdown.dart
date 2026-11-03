@@ -69,7 +69,7 @@ String hostCiRunMarkdownText(
     }
     var stepName = step.stepName;
     if (stepName != null && project != null) {
-      return 'dart ${hostCiStepArguments(project, stepName).join(' ')}';
+      return hostCiStepCommand(project, stepName);
     }
     return null;
   }

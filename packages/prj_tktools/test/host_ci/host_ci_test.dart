@@ -156,7 +156,11 @@ void main() {
 
     Future<DbHostCiProject> addRepo(String name) async {
       var path = p.join(topDir.path, name);
-      await createGitRepo(path, remote: 'git@github.com:owner/$name.git');
+      await createGitRepo(
+        path,
+        remote: 'git@github.com:owner/$name.git',
+        flutterApp: true,
+      );
       return await hostCi.addProject(path);
     }
 

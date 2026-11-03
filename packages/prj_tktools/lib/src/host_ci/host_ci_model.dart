@@ -1,4 +1,3 @@
-import 'package:pub_semver/pub_semver.dart';
 import 'package:tekartik_app_cv_sdb/app_cv_sdb.dart';
 
 export 'package:tekartik_app_cv_sdb/app_cv_sdb.dart'
@@ -36,8 +35,9 @@ enum HostCiStepName {
   /// `run_ci --build`: the web build (`flutter build web`, `webdev build`).
   buildWeb,
 
-  /// `run_ci --host-build`: the host build of the flutter apps (`flutter
-  /// build linux`, `macos` or `windows`), run_ci 1.1.17 and up.
+  /// The host build of the flutter apps, run by Host CI itself (not
+  /// `run_ci`): `flutter build linux`, `macos` or `windows` (`--no-pub`) in
+  /// each flutter package having the platform folder and `lib/main.dart`.
   buildHost,
 
   /// `run_ci --pub-downgrade`: the lowest versions allowed by the
@@ -75,9 +75,6 @@ const hostCiDowngradeSteps = [
   HostCiStepName.pubRestore,
 ];
 
-/// The first `run_ci` version supporting a step, null for any version.
-final _minRunCiVersions = {HostCiStepName.buildHost: Version(1, 1, 17)};
-
 /// Label and command line arguments of a step.
 extension HostCiStepNameExt on HostCiStepName {
   /// Human readable label.
@@ -95,11 +92,16 @@ extension HostCiStepNameExt on HostCiStepName {
     HostCiStepName.pubRestore => 'pub restore',
   };
 
-  /// The `run_ci` flag selecting this step.
-  String get flag => runCiArguments.first;
+  /// The `run_ci` flag selecting this step, empty for
+  /// [HostCiStepName.buildHost] (not a `run_ci` step).
+  String get flag => runCiArguments.isEmpty ? '' : runCiArguments.first;
+
+  /// True for the steps run by `run_ci`, all but [HostCiStepName.buildHost].
+  bool get isRunCi => this != HostCiStepName.buildHost;
 
   /// The `run_ci` arguments of the step (`--recursive` and the project
-  /// arguments excluded), the ones of the GitHub jobs of `tekartik/ci.dart`.
+  /// arguments excluded), the ones of the GitHub jobs of `tekartik/ci.dart`;
+  /// empty for [HostCiStepName.buildHost] (not a `run_ci` step).
   List<String> get runCiArguments => switch (this) {
     HostCiStepName.pubUpgrade => ['--pub-upgrade'],
     HostCiStepName.pubGet => ['--pub-get'],
@@ -108,7 +110,7 @@ extension HostCiStepNameExt on HostCiStepName {
     HostCiStepName.testHost => ['--vm-test', '--no-pub-get'],
     HostCiStepName.testWeb => ['--test', '--no-vm-test', '--no-pub-get'],
     HostCiStepName.buildWeb => ['--build', '--no-pub-get'],
-    HostCiStepName.buildHost => ['--host-build', '--no-pub-get'],
+    HostCiStepName.buildHost => const [],
     HostCiStepName.pubDowngrade => ['--pub-downgrade', '--no-override'],
     HostCiStepName.analyzeDowngrade => [
       '--analyze',
@@ -117,9 +119,6 @@ extension HostCiStepNameExt on HostCiStepName {
     ],
     HostCiStepName.pubRestore => ['--pub-get', '--no-override'],
   };
-
-  /// The first `run_ci` version supporting the step, null for any.
-  Version? get minRunCiVersion => _minRunCiVersions[this];
 
   /// True for the steps resolving the dependencies.
   bool get isPub => switch (this) {

@@ -33,8 +33,9 @@ global prefs (`tkpub init <export>`, dtk menu "set git config path"), or the
 ## Host CI (`dtk ci`)
 
 The CI of local checkouts, run on this machine like a GitHub workflow of
-`tekartik/ci.dart` but local and fast: one `run_ci` process per step, each
-step depending on the previous ones (a failing step skips the next ones).
+`tekartik/ci.dart` but local and fast: one `run_ci` process per step (the
+host build: one `flutter build` per flutter app), each step depending on the
+previous ones (a failing step skips the next ones).
 
 | Step | `run_ci` |
 | --- | --- |
@@ -44,7 +45,7 @@ step depending on the previous ones (a failing step skips the next ones).
 | test host | `--vm-test --no-pub-get` (dart vm, `flutter test`) |
 | test web | `--test --no-vm-test --no-pub-get` (chrome, node) |
 | build web | `--build --no-pub-get` |
-| build host | `--host-build --no-pub-get` (`flutter build linux`..., dev_build 1.1.17) |
+| build host | not `run_ci`: Host CI runs `flutter build linux` (`macos`, `windows`) `--no-pub` in each flutter app having the platform folder and `lib/main.dart` |
 | pub downgrade, analyze downgrade, pub restore | `--pub-downgrade`, `--analyze` on the lowest versions, then the lock files put back and `--pub-get` |
 
 ```bash

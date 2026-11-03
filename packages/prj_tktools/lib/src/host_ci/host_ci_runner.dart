@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dev_build/package.dart' show recursivePubPath;
 import 'package:path/path.dart' as p;
-import 'package:pub_semver/pub_semver.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_git.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_model.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_process.dart';
@@ -50,9 +50,10 @@ const hostCiRunCiPackage = 'dev_build:run_ci';
   return (command: match.group(1)!.trim(), package: match.group(2)!.trim());
 }
 
-/// The `dart` arguments of a step of [project]: `pub global run
-/// dev_build:run_ci`, the step arguments, `--recursive` and the project extra
-/// arguments.
+/// The `dart` arguments of a `run_ci` step of [project] (not
+/// [HostCiStepName.buildHost], see [hostCiHostBuildArguments]): `pub global
+/// run dev_build:run_ci`, the step arguments, `--recursive` and the project
+/// extra arguments.
 List<String> hostCiStepArguments(
   DbHostCiProject project,
   HostCiStepName step,
@@ -66,16 +67,36 @@ List<String> hostCiStepArguments(
   ...?project.extraArgs.v,
 ];
 
-/// The step run by the `dart` [arguments] of a step process
-/// ([hostCiStepArguments]), null for another command (a fake process
-/// starter uses it).
+/// The command of a step of [project] as the reports show it:
+/// `dart pub global run dev_build:run_ci ...` ([hostCiStepArguments]),
+/// `flutter build <host> --no-pub` for [HostCiStepName.buildHost] (run in
+/// each flutter app).
+String hostCiStepCommand(DbHostCiProject project, HostCiStepName step) {
+  if (step.isRunCi) {
+    return 'dart ${hostCiStepArguments(project, step).join(' ')}';
+  }
+  var platform = hostCiHostBuildPlatform ?? '<host>';
+  return 'flutter ${hostCiHostBuildArguments(platform).join(' ')}';
+}
+
+/// The step run by the [arguments] of a step process: the `dart` ones of
+/// [hostCiStepArguments], the `flutter` ones of [hostCiHostBuildArguments];
+/// null for another command (a fake process starter uses it).
 HostCiStepName? hostCiStepOfArguments(List<String> arguments) {
+  if (arguments.length == 3 &&
+      hostCiHostBuildPlatforms.contains(arguments[1]) &&
+      _sameArguments(arguments, hostCiHostBuildArguments(arguments[1]))) {
+    return HostCiStepName.buildHost;
+  }
   var index = arguments.indexOf(hostCiRunCiPackage);
   if (index < 0) {
     return null;
   }
   var rest = arguments.sublist(index + 1);
   for (var step in HostCiStepName.values) {
+    if (!step.isRunCi) {
+      continue;
+    }
     var stepArguments = step.runCiArguments;
     if (rest.length > stepArguments.length &&
         rest[stepArguments.length] == '--recursive') {
@@ -92,6 +113,62 @@ HostCiStepName? hostCiStepOfArguments(List<String> arguments) {
     }
   }
   return null;
+}
+
+bool _sameArguments(List<String> a, List<String> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// The `flutter build` targets of a host build.
+const hostCiHostBuildPlatforms = ['linux', 'macos', 'windows'];
+
+/// The `flutter build` target of this host (`linux`, `macos` or `windows`),
+/// null on another platform (no host build).
+String? get hostCiHostBuildPlatform => Platform.isLinux
+    ? 'linux'
+    : Platform.isMacOS
+    ? 'macos'
+    : Platform.isWindows
+    ? 'windows'
+    : null;
+
+/// The `flutter` arguments of the host build of a flutter app for
+/// [platform] (`linux`, `macos` or `windows`).
+List<String> hostCiHostBuildArguments(String platform) => [
+  'build',
+  platform,
+  '--no-pub',
+];
+
+/// The flutter apps below [root] to build for [platform]: the packages
+/// depending on flutter (found like `run_ci` finds them) that have a
+/// `<platform>` folder and `lib/main.dart`; their paths relative to [root]
+/// (`.` for [root] itself), sorted.
+Future<List<String>> hostCiHostBuildPackages(
+  String root,
+  String platform,
+) async {
+  var apps = <String>[];
+  for (var package in await recursivePubPath(
+    [root],
+    dependencies: ['flutter'],
+  )) {
+    var dir = p.normalize(p.absolute(root, package));
+    if (Directory(p.join(dir, platform)).existsSync() &&
+        File(p.join(dir, 'lib', 'main.dart')).existsSync()) {
+      apps.add(p.relative(dir, from: p.normalize(p.absolute(root))));
+    }
+  }
+  apps.sort();
+  return apps;
 }
 
 /// The folders never searched for lock files.
@@ -148,7 +225,8 @@ Future<void> hostCiRestoreLockFiles(
 }
 
 /// Runs the CI of one project: the git facts, then one `run_ci` process per
-/// step in the repository root, the record and the log kept up to date.
+/// step in the repository root (the host build: one `flutter build` per
+/// flutter app), the record and the log kept up to date.
 ///
 /// The steps depend on each other: a failing step with the fail policy (the
 /// default, always for the pub steps) skips the following ones; a warning or
@@ -428,15 +506,6 @@ class HostCiRunner {
           stepRecord.status.v = HostCiStepStatus.skipped.name;
           continue;
         }
-        var minVersion = step.minRunCiVersion;
-        if (minVersion != null && !_runCiAtLeast(runCiVersion, minVersion)) {
-          stepRecord.status.v = HostCiStepStatus.skipped.name;
-          _addLine(
-            '# ${step.label} skipped: run_ci $minVersion needed '
-            '($runCiVersion here, dart pub global activate dev_build)',
-          );
-          continue;
-        }
         if (step == HostCiStepName.pubDowngrade) {
           savedLockFiles = await hostCiReadLockFiles(path);
         }
@@ -447,12 +516,14 @@ class HostCiRunner {
           ..start.v = stepStart.millisecondsSinceEpoch;
         await store.putRun(run);
         _notify();
-        var exitCode = await _runStepProcess(
-          path,
-          'dart',
-          hostCiStepArguments(project, step),
-          stepRecord,
-        );
+        var exitCode = step.isRunCi
+            ? await _runStepProcess(
+                path,
+                'dart',
+                hostCiStepArguments(project, step),
+                stepRecord,
+              )
+            : await _runHostBuild(path, stepRecord);
         stepRecord
           ..exitCode.v = exitCode
           ..duration.v = now().difference(stepStart).inMilliseconds;
@@ -493,15 +564,6 @@ class HostCiRunner {
     _addLine(
       '=== ${run.runStatus.name}, ${hostCiFormatDuration(now().difference(run.startDateTime!))} ===',
     );
-  }
-
-  bool _runCiAtLeast(String version, Version min) {
-    try {
-      return Version.parse(version) >= min;
-    } catch (_) {
-      // Unknown: let it run (and fail if really too old).
-      return true;
-    }
   }
 
   HostCiStepStatus? _statusOf(DbHostCiRun run, HostCiStepName name) {
@@ -585,6 +647,54 @@ class HostCiRunner {
       _killTimer?.cancel();
       _killTimer = null;
     }
+  }
+
+  /// The host build: `flutter build <host> --no-pub` in each flutter app
+  /// ([hostCiHostBuildPackages]), all of them even after a failure (like
+  /// `run_ci` with its packages), the first failure kept in [stepRecord].
+  ///
+  /// Returns the exit code of the first failure (null when it could not
+  /// start), 0 when all succeed or there is nothing to build.
+  Future<int?> _runHostBuild(String root, DbHostCiStep stepRecord) async {
+    var platform = hostCiHostBuildPlatform;
+    if (platform == null) {
+      _addLine('# no host build on ${Platform.operatingSystem}');
+      return 0;
+    }
+    var packages = await hostCiHostBuildPackages(root, platform);
+    if (packages.isEmpty) {
+      _addLine('# no flutter app with $platform/ and lib/main.dart');
+      return 0;
+    }
+    var arguments = hostCiHostBuildArguments(platform);
+    var command = 'flutter ${arguments.join(' ')}';
+    ({int? exitCode, String package})? failure;
+    for (var package in packages) {
+      if (_cancelled) {
+        break;
+      }
+      _addLine('$hostCiPackageMarker$package');
+      stepRecord
+        ..failedPackage.v = package
+        ..failedCommand.v = command;
+      _notify();
+      var exitCode = await _runStepProcess(
+        p.normalize(p.join(root, package)),
+        'flutter',
+        arguments,
+        stepRecord,
+      );
+      if (exitCode != 0) {
+        failure ??= (exitCode: exitCode, package: package);
+      }
+    }
+    if (failure != null) {
+      stepRecord
+        ..failedPackage.v = failure.package
+        ..failedCommand.v = command;
+      return failure.exitCode;
+    }
+    return 0;
   }
 
   /// The version printed by `executable arguments`, the first line holding a
