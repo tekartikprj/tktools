@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:tekartik_prj_tktools/src/bin/dtk_ci.dart';
 import 'package:test/test.dart';
 
 import 'host_ci/host_ci_test_utils.dart';
@@ -116,8 +117,8 @@ void main() {
     expect(result.stderr, contains('No Host CI project matches "nope"'));
   });
 
-  test('run one step for real', () async {
-    // The real run_ci (an empty checkout: nothing to analyze, fast).
+  /// True when the real run_ci can run (dev_build activated).
+  Future<bool> runCiActivated() async {
     var version = await Process.run(Platform.resolvedExecutable, [
       'pub',
       'global',
@@ -127,6 +128,14 @@ void main() {
     ]);
     if (version.exitCode != 0) {
       markTestSkipped('dev_build not activated');
+      return false;
+    }
+    return true;
+  }
+
+  test('run one step for real', () async {
+    // The real run_ci (an empty checkout: nothing to analyze, fast).
+    if (!await runCiActivated()) {
       return;
     }
     var runs = (await dtkJson(['run', 'repo', '--step', 'analyze'])) as List;
@@ -145,5 +154,49 @@ void main() {
       File(p.join(ciDir, 'report', 'runs', '${run['id']}.html')).existsSync(),
       isTrue,
     );
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test('run --next <n>', () async {
+    expect(dtkCiNextCount([]), 1);
+    expect(dtkCiNextCount(['3']), 3);
+    for (var rest in [
+      ['0'],
+      ['repo'],
+      ['2', 'repo'],
+    ]) {
+      expect(() => dtkCiNextCount(rest), throwsArgumentError, reason: '$rest');
+    }
+    var result = await dtk(['run', '--next', 'repo']);
+    expect(result.exitCode, 1);
+    expect(result.stderr, contains('--next [<n>]'));
+    result = await dtk(['run', '--next', '2', '--all-due']);
+    expect(result.exitCode, 1);
+    expect(result.stderr, contains('--next or --all-due'));
+
+    if (!await runCiActivated()) {
+      return;
+    }
+    // Two empty checkouts, pub upgrade and analyze only (fast).
+    var otherPath = p.join(topDir.path, 'other');
+    await createGitRepo(otherPath, remote: 'git@github.com:owner/other.git');
+    result = await dtk(['add', otherPath]);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    for (var project in ['repo', 'other']) {
+      result = await dtk(['steps', project, 'analyze']);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+    }
+    // 3 asked, 2 due: each runs once.
+    var runs = ((await dtkJson(['run', '--next', '3'])) as List).cast<Map>();
+    expect(runs.map((run) => run['project']).toSet(), {
+      'github.com/owner/repo',
+      'github.com/owner/other',
+    });
+    expect(runs.map((run) => run['trigger']), ['next', 'next']);
+    expect(runs.map((run) => run['status']), ['success', 'success']);
+    // Nothing due any more.
+    expect(await dtkJson(['run', '--next', '2']), isEmpty);
+    result = await dtk(['run', '--next']);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    expect(result.stdout, 'Nothing due\n');
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

@@ -24,7 +24,9 @@ and read everything.
   `dtk ci failures --json`. A run takes the machine for minutes (one run at a
   time, the others wait in the queue: `dtk ci queue`).
 - Run: `dtk ci run <project>` (id, `owner/repo`, repo name or path),
-  `dtk ci run` alone runs the next one, `--all-due` all the due ones. Exit
+  `dtk ci run` alone runs the next one, `--next <n>` the next n ones (what
+  is next read again after each run, a project runs once), `--all-due` all
+  the due ones. Exit
   code 1 when red. `-q` prints the summary only.
 - Retry after a fix: `dtk ci run <project> --from failed` (the failed step
   and the next ones: green, it closes the report) or `--step <step>` (that

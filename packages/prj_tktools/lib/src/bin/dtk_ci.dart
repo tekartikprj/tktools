@@ -250,8 +250,9 @@ class _CiRunCommand extends _CiSubCommand {
     : super(
         name: 'run',
         description:
-            'Run projects (the next one by default), after the runs asked '
-            'before on this machine; exit code 1 when one is red. Retry: '
+            'Run projects (the next one by default, `--next <n>` the next n '
+            'ones), after the runs asked before on this machine; exit code 1 '
+            'when one is red. Retry: '
             '--step <step> (only it, repeatable) or --from <step> (it and '
             'the next ones), `failed` for the failed step of the last run',
       ) {
@@ -267,7 +268,9 @@ class _CiRunCommand extends _CiSubCommand {
     );
     parser.addFlag(
       _flagNext,
-      help: 'The next project (the default without project)',
+      help:
+          'The next project (the default without project), `--next <n>` the '
+          'next n ones, one after the other',
       negatable: false,
     );
     parser.addFlag(
@@ -288,6 +291,16 @@ class _CiRunCommand extends _CiSubCommand {
     await withHostCi((hostCi) async {
       var queries = results.rest;
       var allDue = results.flag(_flagAllDue);
+      // `--next <n>`: a flag (`--next` alone is the next one), the count is
+      // the trailing argument.
+      int? nextCount;
+      if (results.flag(_flagNext)) {
+        if (allDue) {
+          throw ArgumentError('--next or --all-due, not both');
+        }
+        nextCount = dtkCiNextCount(queries);
+        queries = const [];
+      }
       var quiet = results.flag(_flagQuiet) || jsonOutput;
       var interrupted = false;
       var sigint = ProcessSignal.sigint.watch().listen((_) {
@@ -391,26 +404,26 @@ class _CiRunCommand extends _CiSubCommand {
             var project = await findProject(hostCi, query);
             await runOne(project.id, HostCiTrigger.manual);
           }
-        } else if (allDue) {
+        } else {
+          // --all-due, or the next one(s) (`--next <n>`): read again after
+          // each run (what is due changes), a project runs once (a red one
+          // stays due).
+          var count = allDue ? null : (nextCount ?? 1);
+          var trigger = allDue ? HostCiTrigger.allDue : HostCiTrigger.next;
           var done = <String>{};
-          while (!interrupted) {
-            // Read again after each run: what is due changes.
+          while (!interrupted && (count == null || done.length < count)) {
             var due = (await hostCi.getProjects()).due
                 .where((status) => !done.contains(status.project.id))
                 .toList();
             if (due.isEmpty) {
+              if (done.isEmpty && !jsonOutput) {
+                stdout.writeln('Nothing due');
+              }
               break;
             }
             var projectId = due.first.project.id;
             done.add(projectId);
-            await runOne(projectId, HostCiTrigger.allDue);
-          }
-        } else {
-          var next = (await hostCi.getProjects()).next;
-          if (next == null) {
-            stdout.writeln('Nothing due');
-          } else {
-            await runOne(next.project.id, HostCiTrigger.next);
+            await runOne(projectId, trigger);
           }
         }
       } on HostCiQueueCancelledException {
@@ -430,6 +443,23 @@ class _CiRunCommand extends _CiSubCommand {
     });
     return true;
   }
+}
+
+/// The count of `dtk ci run --next [<n>]` from the trailing arguments:
+/// 1 without any, n for a single positive integer, throws otherwise (a
+/// project is run without `--next`).
+int dtkCiNextCount(List<String> rest) {
+  if (rest.isEmpty) {
+    return 1;
+  }
+  var count = rest.length == 1 ? int.tryParse(rest.single) : null;
+  if (count == null || count < 1) {
+    throw ArgumentError(
+      '--next [<n>]: the next project or the next n ones, '
+      'not "${rest.join(' ')}"',
+    );
+  }
+  return count;
 }
 
 class _CiFailuresCommand extends _CiSubCommand {

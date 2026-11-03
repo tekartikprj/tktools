@@ -53,6 +53,7 @@ dtk ci add [<path|owner/repo>...]       # follow checkouts (the current folder)
 dtk ci                                  # status: the due ones first
 dtk ci next                             # what runs next and why
 dtk ci run [<project>...] [--all-due]   # the next one by default
+dtk ci run --next 3                     # the next 3 ones, one after the other
 dtk ci run <project> --step analyze     # retry one step (repeatable; test, build, failed)
 dtk ci run <project> --from failed      # the failed step and the next ones
 dtk ci failures                         # reports kept until validated or green
