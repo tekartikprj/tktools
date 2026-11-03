@@ -58,8 +58,8 @@ void main() {
     expect(result.exitCode, 0, reason: '${result.stderr}');
     expect(
       result.stdout,
-      'github.com/owner/repo: pub upgrade → analyze → test host → test web → '
-      'pub downgrade → analyze downgrade → pub restore\n',
+      'github.com/owner/repo: pub upgrade -> analyze -> test host -> test web '
+      '-> pub downgrade -> analyze downgrade -> pub restore\n',
     );
     result = await dtk(['skip', 'repo', '--platform', 'web']);
     expect(result.exitCode, 0, reason: '${result.stderr}');

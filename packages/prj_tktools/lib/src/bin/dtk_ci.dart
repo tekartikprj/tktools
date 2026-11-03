@@ -944,7 +944,7 @@ class _CiStepsCommand extends _CiSubCommand {
         project = (await hostCi.store.getProject(project.id))!;
       }
       stdout.writeln(
-        '${project.id}: ${project.enabledSteps.map((step) => step.label).join(' → ')}',
+        '${project.id}: ${project.enabledSteps.map((step) => step.label).join(' -> ')}',
       );
     });
     return true;

@@ -61,7 +61,11 @@ class HostCiFileLock implements HostCiLock {
 
 /// Try to lock [file] exclusively without waiting: the open handle holding
 /// the lock, null when another process holds it (or the file is gone).
-Future<RandomAccessFile?> _tryLock(File file) async {
+Future<RandomAccessFile?> _tryLock(
+  File file, {
+  int start = 0,
+  int end = -1,
+}) async {
   RandomAccessFile raf;
   try {
     raf = await file.open(mode: FileMode.append);
@@ -69,13 +73,22 @@ Future<RandomAccessFile?> _tryLock(File file) async {
     return null;
   }
   try {
-    await raf.lock(FileLock.exclusive);
+    await raf.lock(FileLock.exclusive, start, end);
     return raf;
   } catch (_) {
     await raf.close();
     return null;
   }
 }
+
+/// The byte range locked in a ticket, after its content: the content stays
+/// readable by the other processes (a Windows lock forbids reading the
+/// bytes it covers).
+const _ticketLockStart = 1 << 30;
+const _ticketLockEnd = _ticketLockStart + 1;
+
+/// A ticket younger than this is alive (not locked yet by its process).
+const _ticketGrace = Duration(seconds: 2);
 
 /// A run asked on this machine: waiting its turn in the queue, or running.
 class HostCiQueueEntry {
@@ -267,18 +280,17 @@ class HostCiRunQueue {
         '_${pid}_${++_ticketCount}.json';
     var ticketFile = File(p.join(queueDir, name));
     await ticketFile.parent.create(recursive: true);
-    // Written and locked under a temporary name, then renamed (the lock
-    // follows the file): a ticket is never seen unlocked.
-    var tmpFile = File('${ticketFile.path}.tmp');
-    var ticketRaf = await tmpFile.open(mode: FileMode.write);
-    await ticketRaf.lock(FileLock.exclusive);
-    await ticketRaf.writeString(jsonEncode(entry.toJson()));
-    await ticketRaf.flush();
+    // Locked (a range after the content) then written, in place (an open
+    // file cannot be renamed on Windows): the other processes see a young
+    // ticket as alive until it is locked.
     _ownTickets[name] = HostCiQueueEntry.fromJson(
       entry.toJson(),
       ticket: name,
     )!;
-    await tmpFile.rename(ticketFile.path);
+    var ticketRaf = await ticketFile.open(mode: FileMode.write);
+    await ticketRaf.lock(FileLock.exclusive, _ticketLockStart, _ticketLockEnd);
+    await ticketRaf.writeString(jsonEncode(entry.toJson()));
+    await ticketRaf.flush();
     Future<void> dropTicket() async {
       _ownTickets.remove(name);
       try {
@@ -381,8 +393,16 @@ class HostCiRunQueue {
       var file = File(p.join(queueDir, name));
       var ownerPid = int.tryParse(name.split('_').elementAtOrNull(1) ?? '');
       // A ticket of this process that is not in the list is a leftover of
-      // an earlier process with the same pid; the others are probed.
-      var probe = ownerPid == pid ? null : await _tryLock(file);
+      // an earlier process with the same pid; the others are probed, but a
+      // young one (maybe not locked yet).
+      var young = false;
+      try {
+        young =
+            DateTime.now().difference(file.statSync().modified) < _ticketGrace;
+      } catch (_) {}
+      var probe = ownerPid == pid || young
+          ? null
+          : await _tryLock(file, start: _ticketLockStart, end: _ticketLockEnd);
       var dead = ownerPid == pid || probe != null;
       if (probe != null) {
         await probe.unlock();
