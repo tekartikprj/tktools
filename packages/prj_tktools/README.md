@@ -39,6 +39,7 @@ previous ones (a failing step skips the next ones).
 
 | Step | `run_ci` |
 | --- | --- |
+| update (a repository followed from a link only) | not `run_ci`: `git fetch --depth 1`, `git reset --hard`, `git clean -fd` in its clone (cloned again when cleared) |
 | pub upgrade (pub get with `--pub-get-only`) | `--pub-upgrade` |
 | analyze | `--analyze --no-pub-get` |
 | format | `--format --no-pub-get` |
@@ -50,6 +51,8 @@ previous ones (a failing step skips the next ones).
 
 ```bash
 dtk ci add [<path|owner/repo>...]       # follow checkouts (the current folder)
+dtk ci add https://github.com/dart-lang/core/tree/main/pkgs/args  # clone a link
+dtk ci checkouts [--clear <name>] [--clear-all] [--move-to temp|default|<dir>]
 dtk ci                                  # status: the due ones first
 dtk ci next                             # what runs next and why
 dtk ci run [<project>...] [--all-due]   # the next one by default
@@ -85,6 +88,16 @@ dtk ci queue                            # the run in progress, the waiting ones
   each failure (the failing package's part; for tests, the failing tests
   in order with their errors, a repeated error once), the retry commands
   and the last runs.
+- A repository with no local checkout is followed from a link
+  (`https://github.com/<owner>/<repo>`, `/tree/<branch>/<folder>` for a
+  branch and a sub folder, `owner/repo`, a git url; `--clone` even when it
+  has a local checkout): Host CI clones it (shallow) in its checkouts folder
+  (`checkouts/<host>/<owner>/<repo>` of the Host CI folder, or the temp
+  folder, `dtk ci checkouts --move-to temp`), its runs start with the update
+  step. A clone is never "changed" (its remote is not read before a run):
+  due when never run, red or stale. `dtk ci checkouts` lists the clones with
+  their size and projects; a cleared one is cloned again by the next full
+  run of its projects.
 - From Dart: `HostCi.open()` in `package:tekartik_prj_tktools/host_ci.dart`.
 
 ## Doc

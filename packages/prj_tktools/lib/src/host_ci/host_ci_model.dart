@@ -12,6 +12,11 @@ export 'package:tekartik_app_cv_sdb/app_cv_sdb.dart'
 /// previous ones: a failing step (with the [HostCiFailurePolicy.fail]
 /// policy) skips the following ones.
 enum HostCiStepName {
+  /// The checkout of a cloned project ([DbHostCiProject.cloneUrl]) brought
+  /// to the followed branch: `git fetch --depth 1`, `git reset --hard`,
+  /// `git clean -fd` in the clone, run by Host CI itself, first.
+  update,
+
   /// `run_ci --pub-upgrade`, the first step by default.
   pubUpgrade,
 
@@ -79,6 +84,7 @@ const hostCiDowngradeSteps = [
 extension HostCiStepNameExt on HostCiStepName {
   /// Human readable label.
   String get label => switch (this) {
+    HostCiStepName.update => 'update',
     HostCiStepName.pubUpgrade => 'pub upgrade',
     HostCiStepName.pubGet => 'pub get',
     HostCiStepName.analyze => 'analyze',
@@ -93,16 +99,21 @@ extension HostCiStepNameExt on HostCiStepName {
   };
 
   /// The `run_ci` flag selecting this step, empty for
-  /// [HostCiStepName.buildHost] (not a `run_ci` step).
+  /// [HostCiStepName.update] and [HostCiStepName.buildHost] (not `run_ci`
+  /// steps).
   String get flag => runCiArguments.isEmpty ? '' : runCiArguments.first;
 
-  /// True for the steps run by `run_ci`, all but [HostCiStepName.buildHost].
-  bool get isRunCi => this != HostCiStepName.buildHost;
+  /// True for the steps run by `run_ci`, all but [HostCiStepName.update] and
+  /// [HostCiStepName.buildHost].
+  bool get isRunCi =>
+      this != HostCiStepName.update && this != HostCiStepName.buildHost;
 
   /// The `run_ci` arguments of the step (`--recursive` and the project
   /// arguments excluded), the ones of the GitHub jobs of `tekartik/ci.dart`;
-  /// empty for [HostCiStepName.buildHost] (not a `run_ci` step).
+  /// empty for [HostCiStepName.update] and [HostCiStepName.buildHost] (not
+  /// `run_ci` steps).
   List<String> get runCiArguments => switch (this) {
+    HostCiStepName.update => const [],
     HostCiStepName.pubUpgrade => ['--pub-upgrade'],
     HostCiStepName.pubGet => ['--pub-get'],
     HostCiStepName.analyze => ['--analyze', '--no-pub-get'],
@@ -405,10 +416,26 @@ class DbHostCiProject extends ScvStringRecordBase {
   /// Key of the last run, null when never run.
   final lastRun = CvField<int>('lastRun');
 
+  /// The git checkout holding [path] when [path] is a sub folder of it
+  /// (`pkgs/args` of `dart-lang/core`), null when [path] is the checkout.
+  final root = CvField<String>('root');
+
+  /// The remote url of a checkout cloned by Host CI (in its `checkouts`
+  /// folder): the [HostCiStepName.update] step runs first, null for a local
+  /// checkout.
+  final cloneUrl = CvField<String>('cloneUrl');
+
+  /// The branch (or tag) followed by a cloned checkout, null for the default
+  /// branch of the remote.
+  final cloneRef = CvField<String>('cloneRef');
+
   @override
   CvFields get fields => [
     path,
     name,
+    root,
+    cloneUrl,
+    cloneRef,
     added,
     paused,
     steps,
@@ -427,6 +454,24 @@ extension DbHostCiProjectExt on DbHostCiProject {
 
   /// True when the first step is `pub get` (not `pub upgrade`).
   bool get isPubGetOnly => pubGetOnly.v ?? false;
+
+  /// True for a checkout cloned by Host CI ([cloneUrl]).
+  bool get isCloned => cloneUrl.v != null;
+
+  /// The git checkout: [root], or [path] itself.
+  String get gitRoot => root.v ?? path.v ?? '';
+
+  /// The followed ref of a cloned checkout for git (`HEAD`: the default
+  /// branch of the remote).
+  String get cloneFetchRef => cloneRef.v ?? 'HEAD';
+
+  /// The git commands of the [HostCiStepName.update] step, run in
+  /// [gitRoot].
+  List<List<String>> get updateGitCommands => [
+    ['fetch', '--depth', '1', 'origin', cloneFetchRef],
+    ['reset', '--hard', 'FETCH_HEAD'],
+    ['clean', '-fd'],
+  ];
 
   /// The selected steps among [hostCiSelectableSteps], in run order (the
   /// names `test` and `build` of the first versions are both of their
@@ -447,14 +492,16 @@ extension DbHostCiProjectExt on DbHostCiProject {
     return hostCiSelectableSteps.where(selected.contains).toList();
   }
 
-  /// The steps a run executes, in run order: the pub step first, the
-  /// selected ones (the skipped platforms out), the downgrade ones expanded.
+  /// The steps a run executes, in run order: the update of a cloned checkout,
+  /// the pub step, the selected ones (the skipped platforms out), the
+  /// downgrade ones expanded.
   List<HostCiStepName> get enabledSteps {
     var skipped = skippedPlatforms;
     var selected = selectedSteps
         .where((step) => !skipped.contains(step.platform))
         .toList();
     return [
+      if (isCloned) HostCiStepName.update,
       if (isPubGetOnly) HostCiStepName.pubGet else HostCiStepName.pubUpgrade,
       for (var step in selected)
         if (step == HostCiStepName.pubDowngrade) ...[
@@ -531,10 +578,13 @@ extension DbHostCiProjectExt on DbHostCiProject {
   /// When the project was added.
   DateTime? get addedDateTime => _dateTime(added.v);
 
-  /// The owner and repository of the id (`owner/repo`), the id itself when
-  /// it is not a `host/owner/repo` name.
+  /// The id without its host (`owner/repo`, `owner/repo/pkgs/args` for a sub
+  /// folder), the last two parts of a path id, the id itself otherwise.
   String get shortId {
     var parts = id.split('/');
+    if (parts.length >= 3 && parts.first.contains('.')) {
+      return parts.sublist(1).join('/');
+    }
     return parts.length >= 3 ? parts.sublist(parts.length - 2).join('/') : id;
   }
 
@@ -892,12 +942,17 @@ class DbHostCiSettings extends ScvStringRecordBase {
   /// The repositories hidden from the candidates (their ids).
   final hiddenRepos = CvListField<String>('hiddenRepos');
 
+  /// Where the repositories followed from a link are cloned, the
+  /// `checkouts` folder of Host CI when null.
+  final checkoutsDir = CvField<String>('checkoutsDir');
+
   @override
   CvFields get fields => [
     staleAfterDays,
     logsKept,
     fetchBeforeRun,
     hiddenRepos,
+    checkoutsDir,
   ];
 }
 

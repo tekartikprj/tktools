@@ -61,6 +61,10 @@ String hostCiRunMarkdownText(
   // The exact command of a step: the first `$` line of its log section (the
   // runner writes it), else rebuilt.
   String? commandOf(DbHostCiStep step) {
+    // The update runs several git commands: all of them.
+    if (step.stepName == HostCiStepName.update && project != null) {
+      return hostCiStepCommand(project, HostCiStepName.update);
+    }
     var section = sectionOf(step);
     for (var line in section?.lines ?? const <HostCiOutputLine>[]) {
       if (line.text.startsWith(hostCiCommandMarker)) {
@@ -97,6 +101,14 @@ String hostCiRunMarkdownText(
 
   fact('Project', '$projectId (${project?.name.v ?? 'removed'})');
   fact('Checkout', run.path.v);
+  if (project != null && project.isCloned) {
+    fact(
+      'Cloned from',
+      '${project.cloneUrl.v} (${project.cloneRef.v ?? 'default branch'}), '
+          'updated at the start of each full run (shallow clone owned by '
+          'Host CI)',
+    );
+  }
   fact(
     'Commit',
     [

@@ -186,7 +186,9 @@ class HostCiProjects {
   var ago = run.endDateTime == null
       ? ''
       : hostCiTimeAgo(run.endDateTime!, now: now);
-  if (git != null) {
+  // A clone only changes at its update step (the remote is not read here):
+  // never run, red or stale.
+  if (git != null && !project.isCloned) {
     var headChanged = run.head.v != null && run.head.v != git.head;
     var dirtyChanged = (run.dirty.v ?? 0) != git.dirty;
     if (headChanged) {

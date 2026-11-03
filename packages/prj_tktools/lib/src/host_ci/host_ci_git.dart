@@ -174,6 +174,136 @@ String? hostCiProjectIdFromRemoteUrl(String url) {
   ].join('/');
 }
 
+/// The `git` arguments of a shallow clone of [url] in [path] ([ref]: a
+/// branch or a tag, the default branch when null).
+List<String> hostCiCloneArguments(String url, String path, {String? ref}) => [
+  'clone',
+  '--quiet',
+  '--depth',
+  '1',
+  if (ref != null) ...['--branch', ref],
+  url,
+  path,
+];
+
+/// A repository link: a repository, maybe a branch and a sub folder.
+///
+/// From `https://github.com/dart-lang/core/tree/main/pkgs/args`,
+/// `https://github.com/owner/repo(.git)`, `git@github.com:owner/repo.git`,
+/// `github.com/owner/repo` or `owner/repo` (GitHub).
+class HostCiRepoLink {
+  /// The repository unique name (`github.com/dart-lang/core`).
+  final String repoId;
+
+  /// The url to clone (`https://github.com/dart-lang/core.git`, the ssh one
+  /// when given).
+  final String cloneUrl;
+
+  /// The branch (or tag) of a `/tree/<ref>/` link, null otherwise.
+  final String? ref;
+
+  /// The sub folder of a `/tree/<ref>/<path>` link (`pkgs/args`, `/`
+  /// separators), null for the whole repository.
+  final String? subPath;
+
+  /// Creates a link.
+  const HostCiRepoLink({
+    required this.repoId,
+    required this.cloneUrl,
+    this.ref,
+    this.subPath,
+  });
+
+  /// The project id: [repoId], `/` [subPath] for a sub folder.
+  String get projectId => subPath == null ? repoId : '$repoId/$subPath';
+
+  /// The parts of [repoId] (`github.com`, `dart-lang`, `core`).
+  List<String> get repoIdParts => repoId.split('/');
+
+  @override
+  String toString() =>
+      '$cloneUrl${ref == null ? '' : ' $ref'}${subPath == null ? '' : ' $subPath'}';
+}
+
+/// The repository link of [text] (see [HostCiRepoLink]), null when it is not
+/// one (a local path for example).
+HostCiRepoLink? hostCiParseRepoLink(String text) {
+  var link = text.trim();
+  if (link.isEmpty) {
+    return null;
+  }
+  // ssh: git@github.com:owner/repo.git
+  if (RegExp(r'^[^@/:]+@[^:/]+:').hasMatch(link)) {
+    var repoId = hostCiProjectIdFromRemoteUrl(link);
+    return repoId == null
+        ? null
+        : HostCiRepoLink(repoId: repoId, cloneUrl: link);
+  }
+  String host;
+  List<String> segments;
+  var uri = link.contains('://') ? Uri.tryParse(link) : null;
+  if (uri != null) {
+    if (uri.host.isEmpty) {
+      return null;
+    }
+    host = uri.host.toLowerCase();
+    segments = uri.pathSegments.where((part) => part.isNotEmpty).toList();
+  } else {
+    // github.com/owner/repo..., owner/repo (GitHub); not a path.
+    if (link.startsWith('/') ||
+        link.startsWith('.') ||
+        link.startsWith('~') ||
+        link.contains(r'\')) {
+      return null;
+    }
+    var parts = link.split('/').where((part) => part.isNotEmpty).toList();
+    if (parts.length < 2) {
+      return null;
+    }
+    if (parts.first.contains('.') && parts.length >= 3) {
+      host = parts.first.toLowerCase();
+      segments = parts.sublist(1);
+    } else if (parts.length == 2) {
+      host = 'github.com';
+      segments = parts;
+    } else {
+      return null;
+    }
+  }
+  // owner/repo[/-]/tree/<ref>/<sub path> (GitHub, GitLab with `-`).
+  var treeIndex = segments.indexOf('tree');
+  var repoSegments = treeIndex < 0 ? segments : segments.sublist(0, treeIndex);
+  if (repoSegments.isNotEmpty && repoSegments.last == '-') {
+    repoSegments = repoSegments.sublist(0, repoSegments.length - 1);
+  }
+  if (repoSegments.length < 2) {
+    return null;
+  }
+  var repo = repoSegments.last;
+  if (repo.endsWith('.git')) {
+    repo = repo.substring(0, repo.length - 4);
+  }
+  if (repo.isEmpty) {
+    return null;
+  }
+  var ownerPath = repoSegments.sublist(0, repoSegments.length - 1).join('/');
+  String? ref;
+  String? subPath;
+  if (treeIndex >= 0 && treeIndex + 1 < segments.length) {
+    ref = segments[treeIndex + 1];
+    var sub = segments.sublist(treeIndex + 2);
+    if (sub.isNotEmpty) {
+      subPath = sub.join('/');
+    }
+  }
+  return HostCiRepoLink(
+    repoId: '$host/$ownerPath/$repo',
+    cloneUrl: 'https://$host/$ownerPath/$repo.git',
+    ref: ref,
+    subPath: subPath,
+  );
+}
+
 /// The project id of the checkout at [path]: the unique name of its remote,
 /// the canonical path when it has none.
 Future<String> hostCiProjectIdForPath(String path) async {

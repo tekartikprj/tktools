@@ -122,10 +122,17 @@ class HostCiStore {
 
   /// Add a project, ignored when it exists already (the existing record is
   /// returned).
+  ///
+  /// [root] is the git checkout when [path] is a sub folder of it,
+  /// [cloneUrl] and [cloneRef] the remote and branch of a checkout cloned by
+  /// Host CI.
   Future<DbHostCiProject> addProject({
     required String id,
     required String path,
     required String name,
+    String? root,
+    String? cloneUrl,
+    String? cloneRef,
     DateTime? now,
   }) => session((db) async {
     var record = hostCiProjectStore.record(id);
@@ -136,6 +143,9 @@ class HostCiStore {
     var project = DbHostCiProject()
       ..path.v = path
       ..name.v = name
+      ..root.v = root
+      ..cloneUrl.v = cloneUrl
+      ..cloneRef.v = cloneRef
       ..added.v = (now ?? DateTime.now()).millisecondsSinceEpoch;
     return await record.put(db, project);
   });

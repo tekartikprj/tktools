@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:process_run/shell.dart' show userAppDataPath;
 import 'package:tekartik_app_cv_sdb/app_cv_sdb.dart'
     show sdbFactoryIo, SdbFactorySandboxExtension;
+import 'package:tekartik_prj_tktools/src/host_ci/host_ci_checkouts.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_git.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_lock.dart';
 import 'package:tekartik_prj_tktools/src/host_ci/host_ci_model.dart';
@@ -49,8 +50,21 @@ class HostCi {
   /// Logs folder name in [dir].
   static const logsDirName = 'logs';
 
+  /// Name of the folder of the checkouts cloned by Host CI in [dir].
+  static const checkoutsDirName = 'checkouts';
+
   /// The Host CI folder.
   final String dir;
+
+  /// Where Host CI clones the repositories it follows from a link
+  /// ([addClone]) by default: `<dir>/checkouts/<host>/<owner>/<repo>`
+  /// (see [getCheckoutsDir]).
+  String get defaultCheckoutsDir => p.join(dir, checkoutsDirName);
+
+  /// Where Host CI clones the repositories it follows from a link: the
+  /// setting ([setCheckoutsDir]), [defaultCheckoutsDir] when not set.
+  Future<String> getCheckoutsDir() async =>
+      (await store.getSettings()).checkoutsDir.v ?? defaultCheckoutsDir;
 
   /// The database.
   final HostCiStore store;
@@ -252,7 +266,8 @@ class HostCi {
     var current = now();
     var statuses = await Future.wait(
       snapshot.projects.map((project) async {
-        var path = project.path.v ?? '';
+        // The git checkout (the clone of a sub folder project).
+        var path = project.gitRoot;
         var runs = snapshot.runsOf(project.id);
         var lastRun = runs.lastOrNull;
         var lastCompleted = hostCiLastCompletedRun(runs);
@@ -326,17 +341,71 @@ class HostCi {
   /// ([id] when given), its name the folder name ([name] when given).
   ///
   /// Returns the existing project when it is already there.
+  ///
+  /// [root] is the git checkout when [path] is a sub folder of it.
   Future<DbHostCiProject> addProject(
     String path, {
     String? id,
     String? name,
+    String? root,
   }) async {
     var canonicalPath = hostCiCanonicalPath(path);
-    id ??= await hostCiProjectIdForPath(canonicalPath);
+    var canonicalRoot = root == null ? null : hostCiCanonicalPath(root);
+    if (canonicalRoot == canonicalPath) {
+      canonicalRoot = null;
+    }
+    id ??= await hostCiProjectIdForPath(canonicalRoot ?? canonicalPath);
     var project = await store.addProject(
       id: id,
       path: canonicalPath,
       name: name ?? p.basename(canonicalPath),
+      root: canonicalRoot,
+      now: now(),
+    );
+    _changed();
+    return project;
+  }
+
+  /// Follow the checkout of a link ([hostCiParseRepoLink]) in the checkouts
+  /// folder ([getCheckoutsDir]), cloned there when missing (`git clone
+  /// --depth 1`, the branch of the link), the project being its sub folder
+  /// when the link has one; each run updates it first
+  /// ([HostCiStepName.update]), cloning it again when cleared.
+  ///
+  /// Returns the existing project when it is already there; throws when the
+  /// clone fails or the sub folder is not in the repository.
+  Future<DbHostCiProject> addClone(HostCiRepoLink link) async {
+    var root = p.joinAll([await getCheckoutsDir(), ...link.repoIdParts]);
+    if (!hostCiIsGitCheckout(root)) {
+      var dir = Directory(root);
+      if (dir.existsSync()) {
+        await dir.delete(recursive: true);
+      }
+      await dir.parent.create(recursive: true);
+      var result = await Process.run(
+        'git',
+        hostCiCloneArguments(link.cloneUrl, root, ref: link.ref),
+      );
+      if (result.exitCode != 0) {
+        throw StateError(
+          'git clone ${link.cloneUrl} failed: ${(result.stderr as String).trim()}',
+        );
+      }
+    }
+    var subPath = link.subPath;
+    var path = subPath == null
+        ? root
+        : p.joinAll([root, ...subPath.split('/')]);
+    if (!Directory(path).existsSync()) {
+      throw StateError('$subPath not found in ${link.repoId}');
+    }
+    var project = await store.addProject(
+      id: link.projectId,
+      path: path,
+      name: p.basename(path),
+      root: subPath == null ? null : root,
+      cloneUrl: link.cloneUrl,
+      cloneRef: link.ref,
       now: now(),
     );
     _changed();
@@ -357,7 +426,8 @@ class HostCi {
     _changed();
   }
 
-  /// Delete the log files of a removed project.
+  /// Delete the log files of a removed project, and its clone when Host CI
+  /// cloned it and no other project uses it.
   Future<void> purgeDeletedProject(HostCiDeletedProject deleted) async {
     for (var relativePath in deleted.logPaths) {
       try {
@@ -369,6 +439,133 @@ class HostCi {
         // Best effort.
       }
     }
+    var project = deleted.project;
+    var root = project.gitRoot;
+    // Only a clone made by Host CI.
+    if (project.isCloned && root.isNotEmpty) {
+      var used = (await store.getProjects()).any(
+        (other) => other.isCloned && other.gitRoot == root,
+      );
+      if (!used) {
+        try {
+          await Directory(root).delete(recursive: true);
+        } catch (_) {
+          // Best effort.
+        }
+      }
+    }
+  }
+
+  /// The checkouts cloned by Host CI: the clones of the projects followed
+  /// from a link, and the git checkouts left in the checkouts folder by no
+  /// project; with their size ([withSize], it reads every file).
+  Future<List<HostCiCheckout>> getCheckouts({bool withSize = true}) async {
+    var checkoutsDir = await getCheckoutsDir();
+    var projectsByRoot = <String, List<DbHostCiProject>>{};
+    for (var project in await store.getProjects()) {
+      if (project.isCloned && project.gitRoot.isNotEmpty) {
+        projectsByRoot.putIfAbsent(project.gitRoot, () => []).add(project);
+      }
+    }
+    var roots = {
+      ...projectsByRoot.keys,
+      ...await hostCiFindGitCheckouts(checkoutsDir),
+    }.toList()..sort();
+    return [
+      for (var root in roots)
+        HostCiCheckout(
+          path: root,
+          name: p.isWithin(checkoutsDir, root)
+              ? p.posix.joinAll(p.split(p.relative(root, from: checkoutsDir)))
+              : root,
+          exists: hostCiIsGitCheckout(root),
+          size: withSize ? await hostCiDirSize(root) : null,
+          projects: projectsByRoot[root] ?? const [],
+        ),
+    ];
+  }
+
+  /// Delete the checkouts at [paths] (some of [getCheckouts], any other path
+  /// is refused), the one of a running project skipped; their projects stay,
+  /// cloned again by their next full run. Returns the deleted paths.
+  Future<List<String>> clearCheckouts(Iterable<String> paths) async {
+    var known = {
+      for (var checkout in await getCheckouts(withSize: false))
+        checkout.path: checkout,
+    };
+    var running = (await getQueue()).running?.project;
+    var cleared = <String>[];
+    for (var path in paths) {
+      var checkout = known[path];
+      if (checkout == null) {
+        throw ArgumentError('Not a checkout of Host CI: $path');
+      }
+      if (running != null &&
+          checkout.projects.any((project) => project.id == running)) {
+        continue;
+      }
+      var dir = Directory(path);
+      if (dir.existsSync()) {
+        await dir.delete(recursive: true);
+      }
+      cleared.add(path);
+    }
+    _changed();
+    return cleared;
+  }
+
+  /// Clone the repositories followed from a link in [checkoutsDir] from now
+  /// on ([defaultCheckoutsDir] when null; [hostCiTempCheckoutsDir] for the
+  /// temp folder): the projects point there, their next full run clones them
+  /// again; the old clones are deleted with [deleteOld].
+  Future<void> setCheckoutsDir(
+    String? checkoutsDir, {
+    bool deleteOld = false,
+  }) async {
+    var oldDir = await getCheckoutsDir();
+    var newDir = checkoutsDir == null
+        ? defaultCheckoutsDir
+        : hostCiCanonicalPath(checkoutsDir);
+    var oldCheckouts = await getCheckouts(withSize: false);
+    await store.updateSettings((settings) {
+      settings.checkoutsDir.v = newDir == defaultCheckoutsDir ? null : newDir;
+    });
+    if (!p.equals(oldDir, newDir)) {
+      for (var project in await store.getProjects()) {
+        if (!project.isCloned) {
+          continue;
+        }
+        var oldRoot = project.gitRoot;
+        var relative = p.isWithin(oldDir, oldRoot)
+            ? p.relative(oldRoot, from: oldDir)
+            : p.basename(oldRoot);
+        var newRoot = p.join(newDir, relative);
+        var newPath = p.normalize(
+          p.join(newRoot, p.relative(project.path.v ?? oldRoot, from: oldRoot)),
+        );
+        await store.updateProject(project.id, (project) {
+          project.path.v = newPath;
+          if (project.root.v != null) {
+            project.root.v = newRoot;
+          }
+        });
+      }
+      if (deleteOld) {
+        var running = (await getQueue()).running?.project;
+        for (var checkout in oldCheckouts) {
+          if (!p.isWithin(oldDir, checkout.path) ||
+              checkout.projects.any((project) => project.id == running)) {
+            continue;
+          }
+          try {
+            await Directory(checkout.path).delete(recursive: true);
+          } catch (_) {
+            // Best effort.
+          }
+        }
+      }
+    }
+    _changed();
   }
 
   Future<DbHostCiProject> _updateProject(

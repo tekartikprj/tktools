@@ -24,12 +24,17 @@ const _flagAll = 'all';
 const _flagPubGetOnly = 'pub-get-only';
 const _flagFull = 'full';
 const _flagCopy = 'copy';
+const _flagClone = 'clone';
 const _optionMaxLines = 'max-lines';
 const _optionRun = 'run';
 const _optionStep = 'step';
 const _optionFrom = 'from';
 const _optionPlatform = 'platform';
 const _optionSeverity = 'severity';
+const _optionClear = 'clear';
+const _flagClearAll = 'clear-all';
+const _optionMoveTo = 'move-to';
+const _flagDeleteOld = 'delete-old';
 
 /// `dtk ci`: Host CI from the command line, the CI of local checkouts run on
 /// this machine, shared with the apps reading the same folder.
@@ -64,6 +69,7 @@ class DtkCiCommand extends ShellBinCommand {
     addCommand(_CiSkipCommand(skip: false));
     addCommand(_CiPolicyCommand());
     addCommand(_CiStepsCommand());
+    addCommand(_CiCheckoutsCommand());
   }
 
   @override
@@ -744,46 +750,94 @@ class _CiAddCommand extends _CiSubCommand {
     : super(
         name: 'add',
         description:
-            'Follow checkouts: paths, or ids under the git top '
-            '(github.com/owner/repo, owner/repo); the current folder by '
+            'Follow checkouts: paths, ids under the git top '
+            '(github.com/owner/repo, owner/repo), or links '
+            '(https://github.com/dart-lang/core/tree/main/pkgs/args): a '
+            'repository with no local checkout is cloned in the Host CI '
+            'checkouts folder, updated at each run; the current folder by '
             'default',
-      );
+      ) {
+    parser.addFlag(
+      _flagClone,
+      help: 'Clone the link even when it has a local checkout',
+      negatable: false,
+    );
+  }
 
   @override
   FutureOr<bool> onRun() async {
     await withHostCi((hostCi) async {
       var args = results.rest.isEmpty ? ['.'] : results.rest;
+      var clone = results.flag(_flagClone);
       var added = <DbHostCiProject>[];
       for (var arg in args) {
-        added.add(await hostCi.addProject(await _resolvePath(arg)));
+        added.add(await _add(hostCi, arg, clone: clone));
       }
       if (jsonOutput) {
         writeJson([
-          for (var project in added) {'id': project.id, 'path': project.path.v},
+          for (var project in added)
+            {
+              'id': project.id,
+              'path': project.path.v,
+              if (project.isCloned) 'cloneUrl': project.cloneUrl.v,
+              if (project.cloneRef.v != null) 'cloneRef': project.cloneRef.v,
+            },
         ]);
       } else {
         for (var project in added) {
-          stdout.writeln('${project.id} (${project.path.v})');
+          stdout.writeln(
+            '${project.id} (${project.path.v})'
+            '${project.isCloned ? ', cloned from ${project.cloneUrl.v}' : ''}',
+          );
         }
       }
     });
     return true;
   }
 
-  Future<String> _resolvePath(String arg) async {
-    if (Directory(arg).existsSync()) {
-      return arg;
+  /// Add [arg]: a folder, a checkout under the git top, or a link (its local
+  /// checkout, cloned when none or with [clone]).
+  Future<DbHostCiProject> _add(
+    HostCi hostCi,
+    String arg, {
+    required bool clone,
+  }) async {
+    var link = hostCiParseRepoLink(arg);
+    if (!clone && Directory(arg).existsSync()) {
+      return await hostCi.addProject(arg);
     }
     var gitTop = await tkPubFindGitTop();
-    for (var candidate in [
-      p.joinAll([gitTop, ...arg.split('/')]),
-      p.joinAll([gitTop, 'github.com', ...arg.split('/')]),
-    ]) {
-      if (Directory(candidate).existsSync()) {
-        return candidate;
+    if (link == null || (!clone && !arg.contains(':'))) {
+      // owner/repo, github.com/owner/repo under the git top.
+      for (var candidate in [
+        p.joinAll([gitTop, ...arg.split('/')]),
+        p.joinAll([gitTop, 'github.com', ...arg.split('/')]),
+      ]) {
+        if (!clone && Directory(candidate).existsSync()) {
+          return await hostCi.addProject(candidate);
+        }
       }
     }
-    throw StateError('Checkout not found: $arg');
+    if (link == null) {
+      throw StateError('Checkout not found: $arg');
+    }
+    // The local checkout of the link.
+    var local = p.joinAll([gitTop, ...link.repoIdParts]);
+    if (!clone && hostCiIsGitCheckout(local)) {
+      var subPath = link.subPath;
+      if (subPath == null) {
+        return await hostCi.addProject(local);
+      }
+      return await hostCi.addProject(
+        p.joinAll([local, ...subPath.split('/')]),
+        id: link.projectId,
+        root: local,
+      );
+    }
+    stderr.writeln(
+      '# clone ${link.cloneUrl} in ${await hostCi.getCheckoutsDir()}',
+    );
+    return await hostCi.addClone(link);
   }
 }
 
@@ -910,6 +964,148 @@ class _CiPolicyCommand extends _CiSubCommand {
       );
     });
     return true;
+  }
+}
+
+class _CiCheckoutsCommand extends _CiSubCommand {
+  _CiCheckoutsCommand()
+    : super(
+        name: 'checkouts',
+        description:
+            'The repositories cloned by Host CI (projects added from a link): '
+            'their size and projects; --clear some (a name, a project) or '
+            '--clear-all (their projects stay, cloned again by their next '
+            'full run); --move-to a folder (temp, default)',
+      ) {
+    parser.addMultiOption(
+      _optionClear,
+      help: 'Delete this checkout (its name, path or one of its projects)',
+    );
+    parser.addFlag(
+      _flagClearAll,
+      help: 'Delete every checkout',
+      negatable: false,
+    );
+    parser.addOption(
+      _optionMoveTo,
+      help:
+          'Clone in this folder from now on: a path, `temp` (the temp folder '
+          'of the machine) or `default` (in the Host CI folder)',
+    );
+    parser.addFlag(
+      _flagDeleteOld,
+      help: 'With --move-to, delete the checkouts of the old folder',
+      negatable: false,
+    );
+  }
+
+  @override
+  FutureOr<bool> onRun() async {
+    await withHostCi((hostCi) async {
+      var moveTo = results.option(_optionMoveTo);
+      if (moveTo != null) {
+        var dir = switch (moveTo) {
+          'default' => null,
+          'temp' || 'tmp' => hostCiTempCheckoutsDir,
+          _ => moveTo,
+        };
+        await hostCi.setCheckoutsDir(
+          dir,
+          deleteOld: results.flag(_flagDeleteOld),
+        );
+      }
+      var clears = results.multiOption(_optionClear);
+      if (results.flag(_flagClearAll) || clears.isNotEmpty) {
+        var checkouts = await hostCi.getCheckouts(withSize: false);
+        var paths = <String>[];
+        if (results.flag(_flagClearAll)) {
+          paths.addAll([
+            for (var checkout in checkouts)
+              if (checkout.exists) checkout.path,
+          ]);
+        } else {
+          for (var query in clears) {
+            paths.add(await _findCheckout(hostCi, checkouts, query));
+          }
+        }
+        var cleared = await hostCi.clearCheckouts(paths);
+        if (!jsonOutput) {
+          for (var path in paths) {
+            stdout.writeln(
+              cleared.contains(path)
+                  ? 'Cleared $path'
+                  : 'Skipped $path (running)',
+            );
+          }
+        }
+      }
+      var checkoutsDir = await hostCi.getCheckoutsDir();
+      var checkouts = await hostCi.getCheckouts();
+      if (jsonOutput) {
+        writeJson({
+          'dir': checkoutsDir,
+          'checkouts': [
+            for (var checkout in checkouts)
+              {
+                'name': checkout.name,
+                'path': checkout.path,
+                'exists': checkout.exists,
+                'size': checkout.size,
+                'projects': [for (var project in checkout.projects) project.id],
+              },
+          ],
+        });
+        return;
+      }
+      stdout.writeln('# checkouts folder: $checkoutsDir');
+      if (checkouts.isEmpty) {
+        stdout.writeln(
+          'No checkout, add one from a link: dtk ci add '
+          'https://github.com/<owner>/<repo>[/tree/<branch>/<folder>]',
+        );
+        return;
+      }
+      var total = 0;
+      for (var checkout in checkouts) {
+        total += checkout.size ?? 0;
+        stdout.writeln(
+          [
+            if (checkout.exists)
+              hostCiFormatSize(checkout.size ?? 0).padLeft(8)
+            else
+              'cleared'.padLeft(8),
+            checkout.name,
+            if (checkout.projects.isEmpty)
+              'no project'
+            else
+              checkout.projects.map((project) => project.shortId).join(', '),
+          ].join('  '),
+        );
+      }
+      stdout.writeln('${hostCiFormatSize(total).padLeft(8)}  total');
+    });
+    return true;
+  }
+
+  /// The checkout path of [query]: a checkout name or path, or a project.
+  Future<String> _findCheckout(
+    HostCi hostCi,
+    List<HostCiCheckout> checkouts,
+    String query,
+  ) async {
+    for (var checkout in checkouts) {
+      if (checkout.name == query ||
+          checkout.path == hostCiCanonicalPath(query)) {
+        return checkout.path;
+      }
+    }
+    var project = await findProject(hostCi, query);
+    for (var checkout in checkouts) {
+      if (checkout.projects.any((other) => other.id == project.id)) {
+        return checkout.path;
+      }
+    }
+    throw StateError('${project.id} has no checkout cloned by Host CI');
   }
 }
 

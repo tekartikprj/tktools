@@ -28,6 +28,13 @@ and read everything.
   is next read again after each run, a project runs once), `--all-due` all
   the due ones. Exit
   code 1 when red. `-q` prints the summary only.
+- Any repository from a link: `dtk ci add
+  https://github.com/dart-lang/core/tree/main/pkgs/args` (a branch and a sub
+  folder; `owner/repo` or a git url) clones it (shallow) in the Host CI
+  checkouts folder, each full run starts with its `update` step (fetch,
+  reset, clean; cloned again when cleared). `dtk ci checkouts` lists the
+  clones (size, projects), `--clear <name>`, `--clear-all`, `--move-to
+  temp|default|<dir>` (`--delete-old`).
 - Retry after a fix: `dtk ci run <project> --from failed` (the failed step
   and the next ones: green, it closes the report) or `--step <step>` (that
   step only, never a verdict). Steps: `pub-get`, `pub-upgrade`, `analyze`,

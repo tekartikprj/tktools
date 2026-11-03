@@ -5,6 +5,7 @@
 library;
 
 export 'src/host_ci/host_ci.dart';
+export 'src/host_ci/host_ci_checkouts.dart';
 export 'src/host_ci/host_ci_git.dart';
 export 'src/host_ci/host_ci_json.dart';
 export 'src/host_ci/host_ci_lock.dart';

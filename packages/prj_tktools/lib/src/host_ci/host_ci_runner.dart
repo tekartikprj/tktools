@@ -70,10 +70,15 @@ List<String> hostCiStepArguments(
 /// The command of a step of [project] as the reports show it:
 /// `dart pub global run dev_build:run_ci ...` ([hostCiStepArguments]),
 /// `flutter build <host> --no-pub` for [HostCiStepName.buildHost] (run in
-/// each flutter app).
+/// each flutter app), the git commands of [HostCiStepName.update].
 String hostCiStepCommand(DbHostCiProject project, HostCiStepName step) {
   if (step.isRunCi) {
     return 'dart ${hostCiStepArguments(project, step).join(' ')}';
+  }
+  if (step == HostCiStepName.update) {
+    return project.updateGitCommands
+        .map((args) => 'git ${args.join(' ')}')
+        .join(' && ');
   }
   var platform = hostCiHostBuildPlatform ?? '<host>';
   return 'flutter ${hostCiHostBuildArguments(platform).join(' ')}';
@@ -397,8 +402,35 @@ class HostCiRunner {
     return run;
   }
 
+  /// Read the git facts of [gitRoot] into [run], with a log line.
+  Future<void> _readGitFacts(
+    DbHostCiRun run,
+    String gitRoot, {
+    required bool fetch,
+    String what = 'at',
+  }) async {
+    var git = await hostCiReadGitFacts(gitRoot, fetch: fetch);
+    if (git != null) {
+      run
+        ..head.v = git.head
+        ..branch.v = git.branch
+        ..commitTime.v = git.commitTime?.millisecondsSinceEpoch
+        ..dirty.v = git.dirty
+        ..ahead.v = git.ahead
+        ..behind.v = git.behind;
+      _addLine(
+        '# ${project.id} $what ${git.shortHead}'
+        '${git.branch == null ? '' : ' (${git.branch})'}'
+        '${git.isClean ? ', clean' : ', ${git.dirty} modified file${git.dirty > 1 ? 's' : ''}'}'
+        '${git.ahead == null ? '' : ', ${git.ahead} ahead'}',
+      );
+    }
+  }
+
   Future<void> _runSteps(DbHostCiRun run) async {
     var path = project.path.v ?? '';
+    // The git checkout (the clone of a sub folder project).
+    var gitRoot = project.gitRoot;
     var stepRecords = run.stepList;
 
     void fail(String message) {
@@ -411,34 +443,37 @@ class HostCiRunner {
       }
     }
 
-    // The checkout.
-    if (path.isEmpty || !Directory(path).existsSync()) {
-      fail('Folder not found: $path');
-      return;
+    // The checkout; a clone cleared (or in a temp folder gone) comes back
+    // at its update step.
+    var updating =
+        project.isCloned &&
+        stepRecords.any((step) => step.stepName == HostCiStepName.update);
+    if (!updating) {
+      if (path.isEmpty || !Directory(path).existsSync()) {
+        fail(
+          'Folder not found: $path'
+          '${project.isCloned ? ' (cleared clone: a full run clones it again)' : ''}',
+        );
+        return;
+      }
+      if (!hostCiIsGitCheckout(gitRoot)) {
+        fail('Not a git checkout: $gitRoot');
+        return;
+      }
     }
-    if (!hostCiIsGitCheckout(path)) {
-      fail('Not a git checkout: $path');
-      return;
-    }
-    var git = await hostCiReadGitFacts(
-      path,
-      fetch: settings.fetchBeforeRunValue,
-    );
-    if (git != null) {
-      run
-        ..head.v = git.head
-        ..branch.v = git.branch
-        ..commitTime.v = git.commitTime?.millisecondsSinceEpoch
-        ..dirty.v = git.dirty
-        ..ahead.v = git.ahead
-        ..behind.v = git.behind;
+    if (project.isCloned) {
       _addLine(
-        '# ${project.id} at ${git.shortHead}'
-        '${git.branch == null ? '' : ' (${git.branch})'}'
-        '${git.isClean ? ', clean' : ', ${git.dirty} modified file${git.dirty > 1 ? 's' : ''}'}'
-        '${git.ahead == null ? '' : ', ${git.ahead} ahead'}',
+        '# clone of ${project.cloneUrl.v}'
+        '${project.cloneRef.v == null ? '' : ', ${project.cloneRef.v}'}'
+        '${project.root.v == null ? '' : ', in ${p.posix.joinAll(p.split(p.relative(path, from: gitRoot)))}'}',
       );
     }
+    await _readGitFacts(
+      run,
+      gitRoot,
+      // A clone is fetched by its update step.
+      fetch: settings.fetchBeforeRunValue && !project.isCloned,
+    );
     var options = project.optionsSummary;
     if (options.isNotEmpty) {
       _addLine('# options: $options');
@@ -525,7 +560,17 @@ class HostCiRunner {
                 hostCiStepArguments(project, step),
                 stepRecord,
               )
+            : step == HostCiStepName.update
+            ? await _runUpdate(gitRoot, stepRecord)
             : await _runHostBuild(path, stepRecord);
+        if (step == HostCiStepName.update && exitCode == 0) {
+          // The run is about the updated commit.
+          await _readGitFacts(run, gitRoot, fetch: false, what: 'updated to');
+          if (!Directory(path).existsSync()) {
+            _addLine('Folder not found after the update: $path', isError: true);
+            exitCode = 1;
+          }
+        }
         stepRecord
           ..exitCode.v = exitCode
           ..duration.v = now().difference(stepStart).inMilliseconds;
@@ -649,6 +694,68 @@ class HostCiRunner {
       _killTimer?.cancel();
       _killTimer = null;
     }
+  }
+
+  /// The update of a cloned checkout in [gitRoot]: its git commands
+  /// ([DbHostCiProjectExt.updateGitCommands]) one after the other, stopping at
+  /// the first failure.
+  ///
+  /// Returns the exit code of the failing command (null when it could not
+  /// start), 0 when all succeed.
+  Future<int?> _runUpdate(String gitRoot, DbHostCiStep stepRecord) async {
+    if (!hostCiIsGitCheckout(gitRoot)) {
+      // Cleared (or a temp folder gone): cloned again.
+      var dir = Directory(gitRoot);
+      if (dir.existsSync()) {
+        await dir.delete(recursive: true);
+      }
+      await dir.parent.create(recursive: true);
+      var arguments = hostCiCloneArguments(
+        project.cloneUrl.v!,
+        gitRoot,
+        ref: project.cloneRef.v,
+      );
+      var command = 'git ${arguments.join(' ')}';
+      stepRecord
+        ..failedPackage.v = '.'
+        ..failedCommand.v = command;
+      _notify();
+      var exitCode = await _runStepProcess(
+        dir.parent.path,
+        'git',
+        arguments,
+        stepRecord,
+      );
+      if (exitCode != 0) {
+        stepRecord
+          ..failedPackage.v = '.'
+          ..failedCommand.v = command;
+      }
+      return exitCode;
+    }
+    for (var arguments in project.updateGitCommands) {
+      if (_cancelled) {
+        return null;
+      }
+      var command = 'git ${arguments.join(' ')}';
+      stepRecord
+        ..failedPackage.v = '.'
+        ..failedCommand.v = command;
+      _notify();
+      var exitCode = await _runStepProcess(
+        gitRoot,
+        'git',
+        arguments,
+        stepRecord,
+      );
+      if (exitCode != 0) {
+        stepRecord
+          ..failedPackage.v = '.'
+          ..failedCommand.v = command;
+        return exitCode;
+      }
+    }
+    return 0;
   }
 
   /// The host build: `flutter build <host> --no-pub` in each flutter app
