@@ -11,7 +11,8 @@ description: >-
   and the dtkMenu / DtkProject helpers. Also use the dtk command line (dtk
   repos / repo / packages / package / path / sync, --json) or DtkRegistry to
   find where a registered repository or package is checked out, which packages
-  a repository holds, and which clones are missing.
+  a repository holds, and which clones are missing; dtk run / test / devices
+  run a project's main, tool or test files on the vm or a device.
 ---
 
 # dtk: multi-project databases, host env and menus (tekartik_prj_tktools)
@@ -63,6 +64,15 @@ VM only (`dart:io`, shells, prefs on disk).
   dtk path sembast                        # a package path, else a repository path
   dtk sync [--tag main] [--clone]         # {gitTop, missing, unregistered, cloned, failed}
   ```
+* Run and test a project (the one holding the current folder): `dtk run
+  --list` (entries, dart|flutter, the import chain to Flutter), `dtk run
+  [entry|part of its path] [-d vm|chrome|<device>] [--dart|--flutter]
+  [--dry-run] [-- program args]` (a Flutter entry without `-d`:
+  `TK_FLUTTER_DEVICE_ID`, the only device, else a numbered pick on stdin),
+  `dtk test [paths] [-p vm|chrome|node|firefox|<device>]...` (dart test or
+  flutter test from the imports, every platform run, a summary, exit 1 if one
+  failed), `dtk devices [--json] [--launch <emulator>]`. Core:
+  `package:tekartik_prj_tktools/dart_run.dart`.
 * A repository query that matches several ids fails with the list (`dtk repo
   cv.dart` when a fork is registered too): pass `owner/repo` or the full id.
 * `missing` leaves the `omit` repositories out; `unregistered` lists the

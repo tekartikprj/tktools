@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:dev_build/shell.dart';
 import 'package:tekartik_prj_tktools/src/bin/dtk_ci.dart';
+import 'package:tekartik_prj_tktools/src/bin/dtk_run.dart';
 import 'package:tekartik_prj_tktools/src/dtk/dtk_registry.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/src/version.dart';
@@ -55,6 +56,9 @@ class DtkCommand extends ShellBinCommand {
     addCommand(_DtkPathCommand());
     addCommand(_DtkSyncCommand());
     addCommand(DtkCiCommand());
+    addCommand(DtkRunCommand());
+    addCommand(DtkTestCommand());
+    addCommand(DtkDevicesCommand());
   }
 
   @override

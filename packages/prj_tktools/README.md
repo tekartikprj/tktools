@@ -30,6 +30,36 @@ global prefs (`tkpub init <export>`, dtk menu "set git config path"), or the
 `--git-top`, else `TEKARTIK_GIT_TOP`, else the folder holding the nearest
 `github.com`. From Dart: `DtkRegistry.load()` in `package:tekartik_prj_tktools/dtk.dart`.
 
+## Run and test (`dtk run`, `dtk test`, `dtk devices`)
+
+What a project runs (lib `main` files, example, bin, tool) and tests (test,
+integration_test), each one `dart` or `flutter`: its imports are followed up
+to a Flutter SDK library (`package:flutter/...`, `dart:ui`), conditional
+imports as the Dart VM compiles them. Run in the project holding the current
+folder (or the entry, or `--project`).
+
+```bash
+dtk run --list                          # entries, dart|flutter, the import chain to Flutter
+dtk run                                 # the only entry, else a numbered pick (stdin)
+dtk run tool/build.dart -- --verbose    # dart run tool/build.dart --verbose
+dtk run main_runner -d emulator-5554    # a part of the path; flutter run -d emulator-5554 -t lib/main_runner.dart
+dtk run lib/main.dart --dry-run         # print the command line only
+dtk test                                # test/ on the vm: dart test, or flutter test when one test imports Flutter
+dtk test test/src -p vm -p chrome,node  # each platform run, a summary, exit 1 if one failed
+dtk test integration_test -p emulator-5554  # flutter test -d emulator-5554 integration_test
+dtk devices [--json]                    # flutter devices + emulators
+dtk devices --launch Pixel_9            # launch an emulator
+```
+
+A Flutter entry without `-d` runs on `TK_FLUTTER_DEVICE_ID` (process_run
+env: `ds env var set TK_FLUTTER_DEVICE_ID <id>`, the one `fdm` sets), else
+the only device, else the one picked (the number typed on stdin, an IDE run
+console works too); a Dart entry runs on the vm. `--dart` / `--flutter` force
+the tool, any platform is tried (`-p node` of a Flutter test fails the way
+`dart test` fails). From Dart: `package:tekartik_prj_tktools/dart_run.dart`
+(`scanDartRunEntries`, `DartImportScanner`, `dartRunCommandLine`,
+`getDartRunDevices`), the same core as the tktoolsapp run dialog.
+
 ## Host CI (`dtk ci`)
 
 The CI of local checkouts, run on this machine like a GitHub workflow of
