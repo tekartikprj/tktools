@@ -71,8 +71,10 @@ VM only (`dart:io`, shells, prefs on disk).
   `TK_FLUTTER_DEVICE_ID`, the only device, else a numbered pick on stdin),
   `dtk test [paths] [-p vm|chrome|node|firefox|<device>]...` (dart test or
   flutter test from the imports, every platform run, a summary, exit 1 if one
-  failed), `dtk devices [--json] [--launch <emulator>]`. Core:
-  `package:tekartik_prj_tktools/dart_run.dart`.
+  failed), `dtk devices [--json] [--launch <emulator>]`. A missing platform
+  folder (`linux/` for `-d linux`) fails before flutter runs, unless
+  `--create-platform` (`flutterCreatePlatforms`: only the platform folder is
+  kept). Core: `package:tekartik_prj_tktools/dart_run.dart`.
 * A repository query that matches several ids fails with the list (`dtk repo
   cv.dart` when a fork is registered too): pass `owner/repo` or the full id.
 * `missing` leaves the `omit` repositories out; `unregistered` lists the

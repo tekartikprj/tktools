@@ -44,6 +44,7 @@ dtk run                                 # the only entry, else a numbered pick (
 dtk run tool/build.dart -- --verbose    # dart run tool/build.dart --verbose
 dtk run main_runner -d emulator-5554    # a part of the path; flutter run -d emulator-5554 -t lib/main_runner.dart
 dtk run lib/main.dart --dry-run         # print the command line only
+dtk run lib/main.dart -d linux --create-platform  # create linux/ first when missing
 dtk test                                # test/ on the vm: dart test, or flutter test when one test imports Flutter
 dtk test test/src -p vm -p chrome,node  # each platform run, a summary, exit 1 if one failed
 dtk test integration_test -p emulator-5554  # flutter test -d emulator-5554 integration_test
@@ -56,9 +57,20 @@ env: `ds env var set TK_FLUTTER_DEVICE_ID <id>`, the one `fdm` sets), else
 the only device, else the one picked (the number typed on stdin, an IDE run
 console works too); a Dart entry runs on the vm. `--dart` / `--flutter` force
 the tool, any platform is tried (`-p node` of a Flutter test fails the way
-`dart test` fails). From Dart: `package:tekartik_prj_tktools/dart_run.dart`
-(`scanDartRunEntries`, `DartImportScanner`, `dartRunCommandLine`,
-`getDartRunDevices`), the same core as the tktoolsapp run dialog.
+`dart test` fails).
+
+A Flutter run needs the platform folder of its target (`linux/` for `-d
+linux`, `web/` in Chrome, `android/` on an emulator), integration tests on a
+device too. When it is missing, `dtk run` and `dtk test` fail before running
+flutter, unless `--create-platform` creates it: `flutter create --platforms
+<platform> --no-pub --project-name <pubspec name> .`, everything else it adds
+to an existing project (`lib/main.dart`, `test/widget_test.dart`, `.idea/`,
+`<name>.iml`, `.metadata`, `README.md`...) removed.
+
+From Dart: `package:tekartik_prj_tktools/dart_run.dart` (`scanDartRunEntries`,
+`DartImportScanner`, `dartRunCommandLine`, `getDartRunDevices`,
+`dartRunFlutterPlatform`, `flutterCreatePlatforms`), the same core as the
+tktoolsapp run dialog.
 
 ## Host CI (`dtk ci`)
 

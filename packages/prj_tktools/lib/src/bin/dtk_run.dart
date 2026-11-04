@@ -17,6 +17,47 @@ const _flagFlutter = 'flutter';
 const _flagList = 'list';
 const _flagDryRun = 'dry-run';
 const _flagJson = 'json';
+const _flagCreatePlatform = 'create-platform';
+
+/// The help of --create-platform.
+const _createPlatformHelp =
+    'Create the platform folder the command needs when missing (linux/ for '
+    'flutter run -d linux): flutter create --platforms <platform>, the '
+    'other files it adds removed';
+
+/// Fails when the project at [projectPath] has no [platform] folder (that
+/// [command] needs, see `dartRunFlutterPlatform`), unless [create] creates
+/// it; a dry run prints the create command or the warning.
+Future<void> _checkFlutterPlatform(
+  String projectPath,
+  String? platform, {
+  required String command,
+  required bool create,
+  required bool dryRun,
+}) async {
+  if (platform == null ||
+      flutterProjectExistingPlatforms(projectPath).contains(platform)) {
+    return;
+  }
+  var createCommand = flutterCreatePlatformsCommandLine([platform]);
+  if (create) {
+    if (dryRun) {
+      stdout.writeln(createCommand);
+    } else {
+      stdout.writeln('Creating $platform/ ($createCommand)');
+      await flutterCreatePlatforms(projectPath, [platform]);
+    }
+    return;
+  }
+  var message =
+      'No $platform/ folder in $projectPath, `$command` needs it: add '
+      '--$_flagCreatePlatform ($createCommand)';
+  if (dryRun) {
+    stderr.writeln(message);
+    return;
+  }
+  throw StateError(message);
+}
 
 /// The hint when no device can be chosen.
 const _deviceHint =
@@ -64,6 +105,11 @@ class DtkRunCommand extends ShellBinCommand {
         _flagDryRun,
         negatable: false,
         help: 'Print the command line, do not run it',
+      )
+      ..addFlag(
+        _flagCreatePlatform,
+        negatable: false,
+        help: _createPlatformHelp,
       );
   }
 
@@ -93,7 +139,15 @@ class DtkRunCommand extends ShellBinCommand {
       flutter: flutter,
       args: shellArguments(extra),
     );
-    if (results.flag(_flagDryRun)) {
+    var dryRun = results.flag(_flagDryRun);
+    await _checkFlutterPlatform(
+      projectPath,
+      dartRunFlutterPlatform(entry.entry, target: target, flutter: flutter),
+      command: command,
+      create: results.flag(_flagCreatePlatform),
+      dryRun: dryRun,
+    );
+    if (dryRun) {
       stdout.writeln(command);
       return true;
     }
@@ -137,6 +191,11 @@ class DtkTestCommand extends ShellBinCommand {
         _flagDryRun,
         negatable: false,
         help: 'Print the command lines, do not run them',
+      )
+      ..addFlag(
+        _flagCreatePlatform,
+        negatable: false,
+        help: _createPlatformHelp,
       );
   }
 
@@ -170,11 +229,19 @@ class DtkTestCommand extends ShellBinCommand {
     var dryRun = results.flag(_flagDryRun);
     var outcomes = <(String, String, int)>[];
     for (var platform in platforms) {
+      var target = DartRunTarget.fromId(platform);
       var command = dartTestCommandLine(
         paths,
-        target: DartRunTarget.fromId(platform),
+        target: target,
         flutter: flutter,
         args: shellArguments(extra),
+      );
+      await _checkFlutterPlatform(
+        projectPath,
+        dartTestFlutterPlatform(paths, target: target),
+        command: command,
+        create: results.flag(_flagCreatePlatform),
+        dryRun: dryRun,
       );
       if (dryRun) {
         stdout.writeln(command);

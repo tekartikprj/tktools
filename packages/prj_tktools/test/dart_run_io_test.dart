@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart';
+import 'package:process_run/shell.dart' show whichSync;
 import 'package:tekartik_prj_tktools/dart_run.dart';
 import 'package:test/test.dart';
 
@@ -353,4 +354,120 @@ To run an emulator, run 'flutter emulators --launch <emulator id>'.
     ]);
     expect(emulators.last.platform, 'ios');
   });
+
+  test('dartRunFlutterPlatform', () {
+    const main = DartRunEntry(path: 'lib/main.dart', folder: DartRunFolder.lib);
+    const unitTests = DartRunEntry(
+      path: 'test',
+      folder: DartRunFolder.test,
+      isDirectory: true,
+    );
+    const integrationTest = DartRunEntry(
+      path: 'integration_test/app_test.dart',
+      folder: DartRunFolder.integrationTest,
+    );
+    DartRunTarget device(String id, String targetPlatform) =>
+        DartRunTarget.device(
+          DartRunDevice(id: id, name: id, targetPlatform: targetPlatform),
+        );
+    String? platform(
+      DartRunEntry entry,
+      DartRunTarget target, {
+      bool flutter = true,
+    }) => dartRunFlutterPlatform(
+      entry,
+      target: target,
+      flutter: flutter,
+      hostOs: 'linux',
+    );
+
+    // A run.
+    expect(platform(main, DartRunTarget.vm), 'linux');
+    expect(platform(main, DartRunTarget.vm, flutter: false), isNull);
+    expect(platform(main, DartRunTarget.chrome, flutter: false), 'web');
+    expect(platform(main, device('pixel', 'android-arm64')), 'android');
+    expect(platform(main, device('iphone', 'ios')), 'ios');
+    expect(platform(main, device('macos', 'darwin')), 'macos');
+    expect(platform(main, device('windows', 'windows-x64')), 'windows');
+    expect(platform(main, device('chrome', 'web-javascript')), 'web');
+    expect(platform(main, device('tv', 'fuchsia')), isNull);
+    // A device id only (-d linux), its platform unknown.
+    expect(platform(main, DartRunTarget.fromId('linux')), 'linux');
+    expect(platform(main, DartRunTarget.fromId('emulator-5554')), 'android');
+    expect(platform(main, DartRunTarget.fromId('pixel')), isNull);
+    // A test: integration tests on a device only.
+    expect(platform(unitTests, DartRunTarget.vm), isNull);
+    expect(platform(unitTests, DartRunTarget.fromId('linux')), isNull);
+    expect(platform(integrationTest, DartRunTarget.vm), isNull);
+    expect(platform(integrationTest, DartRunTarget.fromId('linux')), 'linux');
+    expect(
+      dartTestFlutterPlatform([
+        'test/a_test.dart',
+        'integration_test',
+      ], target: device('pixel', 'android-x64')),
+      'android',
+    );
+
+    expect(
+      flutterCreatePlatformsCommandLine(['linux', 'web']),
+      'flutter create --platforms linux,web --no-pub .',
+    );
+    expect(
+      flutterCreatePlatformsCommandLine(['linux'], projectName: 'my_app'),
+      'flutter create --platforms linux --no-pub --project-name my_app .',
+    );
+  });
+
+  test(
+    'flutterCreatePlatforms',
+    () async {
+      // A folder name that is not the package name, no lib/main.dart, no
+      // test/: flutter create would add them.
+      var project = join(top.path, 'my_folder');
+      write('my_folder/pubspec.yaml', '''
+name: fc_app
+environment:
+  sdk: ^3.9.0
+dependencies:
+  flutter:
+    sdk: flutter
+''');
+      write(
+        'my_folder/lib/main_x.dart',
+        "import 'package:flutter/widgets.dart';\n"
+            'void main() => runApp(const SizedBox());\n',
+      );
+      write('my_folder/README.md', 'mine');
+      write('my_folder/android/keep.txt', 'an existing platform');
+      expect(flutterProjectExistingPlatforms(project), ['android']);
+
+      List<String> files() =>
+          Directory(project)
+              .listSync(recursive: true)
+              .whereType<File>()
+              .map((file) => relative(file.path, from: project))
+              .where(
+                (path) =>
+                    !path.startsWith('linux') && !path.startsWith('.dart_tool'),
+              )
+              .toList()
+            ..sort();
+      var before = files();
+      expect(await flutterCreatePlatforms(project, ['android', 'linux']), [
+        'linux',
+      ]);
+      expect(flutterProjectExistingPlatforms(project), ['android', 'linux']);
+      // Only linux/ was added, named after the package.
+      expect(files(), before);
+      expect(File(join(project, 'README.md')).readAsStringSync(), 'mine');
+      expect(
+        File(join(project, 'linux', 'CMakeLists.txt')).readAsStringSync(),
+        contains('set(BINARY_NAME "fc_app")'),
+      );
+      // Nothing missing: no flutter create.
+      expect(await flutterCreatePlatforms(project, ['linux']), isEmpty);
+    },
+    skip: whichSync('flutter') == null ? 'flutter not found' : null,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }

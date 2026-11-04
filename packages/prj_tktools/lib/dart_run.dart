@@ -38,5 +38,14 @@ export 'src/dart_run/dart_run_entry.dart'
         dartSourceWithoutComments,
         findDartRunEntries,
         findDartTestFiles;
+export 'src/dart_run/dart_run_platform.dart'
+    show
+        dartRunFlutterPlatform,
+        dartTestFlutterPlatform,
+        flutterCreatePlatforms,
+        flutterCreatePlatformsCommandLine,
+        flutterPlatformOfDevice,
+        flutterProjectExistingPlatforms,
+        flutterProjectPlatforms;
 export 'src/dart_run/dart_run_scan.dart'
     show DartRunProjectEntry, scanDartRunEntries;

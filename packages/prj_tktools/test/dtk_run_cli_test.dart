@@ -174,6 +174,54 @@ void main() {
     );
   });
 
+  test('run: missing platform folder', () async {
+    // Fails before running flutter.
+    var result = await dtk(['run', 'lib/main.dart', '-d', 'linux']);
+    expect(result.exitCode, 1, reason: '${result.stdout}');
+    expect(
+      result.stderr,
+      contains(
+        'No linux/ folder in $app, `flutter run -d linux -t lib/main.dart` '
+        'needs it: add --create-platform '
+        '(flutter create --platforms linux --no-pub .)',
+      ),
+    );
+    // A dry run warns.
+    result = await dtk(['run', 'lib/main.dart', '-d', 'linux', '--dry-run']);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    expect(result.stdout, 'flutter run -d linux -t lib/main.dart\n');
+    expect(result.stderr, contains('No linux/ folder'));
+    // Created first.
+    expect(
+      await dtkOut([
+        'run',
+        'lib/main.dart',
+        '-d',
+        'linux',
+        '--create-platform',
+        '--dry-run',
+      ]),
+      'flutter create --platforms linux --no-pub .\n'
+      'flutter run -d linux -t lib/main.dart\n',
+    );
+    // A Dart run and unit tests need none, integration tests on a device do.
+    result = await dtk(['run', 'tool/hello.dart', '--dry-run']);
+    expect(result.stderr, isNot(contains('folder')));
+    result = await dtk(['test', '-p', 'linux', '--dry-run']);
+    expect(result.stderr, isNot(contains('folder')));
+    write(
+      'app/integration_test/app_test.dart',
+      "import 'package:test/test.dart';",
+    );
+    try {
+      result = await dtk(['test', 'integration_test', '-p', 'emulator-5554']);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('No android/ folder'));
+    } finally {
+      Directory(p.join(app, 'integration_test')).deleteSync(recursive: true);
+    }
+  });
+
   test('run: the entry asked', () async {
     // No input.
     var result = await dtk(['run', 'main', '--dry-run']);
