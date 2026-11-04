@@ -178,12 +178,17 @@ void main() {
     // Fails before running flutter.
     var result = await dtk(['run', 'lib/main.dart', '-d', 'linux']);
     expect(result.exitCode, 1, reason: '${result.stdout}');
+    // The project path as dtk resolves it (/private/var/... on macOS for a
+    // /var/... temp folder).
     expect(
       result.stderr,
-      contains(
-        'No linux/ folder in $app, `flutter run -d linux -t lib/main.dart` '
-        'needs it: add --create-platform '
-        '(flutter create --platforms linux --no-pub .)',
+      allOf(
+        contains('No linux/ folder in '),
+        contains(
+          'app, `flutter run -d linux -t lib/main.dart` '
+          'needs it: add --create-platform '
+          '(flutter create --platforms linux --no-pub .)',
+        ),
       ),
     );
     // A dry run warns.

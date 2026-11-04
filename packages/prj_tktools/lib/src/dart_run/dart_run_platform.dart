@@ -110,17 +110,19 @@ List<String> flutterProjectExistingPlatforms(String projectPath) => [
 ];
 
 /// The `flutter create` command line, run in a project, creating its
-/// [platforms] folders: `flutter create --platforms linux,web --no-pub
-/// [--project-name <name>] .`.
+/// [platforms] folders: `flutter create [--template <template>] --platforms
+/// linux,web --no-pub [--project-name <name>] .`.
 ///
 /// [projectName] (the pubspec name) gives the app its name (the Linux
 /// binary, the Android package), the folder name otherwise.
 String flutterCreatePlatformsCommandLine(
   List<String> platforms, {
   String? projectName,
+  String? template,
 }) => [
   'flutter',
   'create',
+  if (template != null) ...['--template', shellArgument(template)],
   '--platforms',
   shellArgument(platforms.join(',')),
   '--no-pub',
@@ -140,11 +142,13 @@ const _createIgnoredDirs = {'.dart_tool', 'build', '.git'};
 /// deleted.
 ///
 /// Returns the platforms created, empty when none was missing. [shell] runs
-/// `flutter create` (verbose by default), in [projectPath].
+/// `flutter create` (verbose by default) in [projectPath], whatever its
+/// working directory; [template] is passed to `flutter create`.
 Future<List<String>> flutterCreatePlatforms(
   String projectPath,
   List<String> platforms, {
   Shell? shell,
+  String? template,
 }) async {
   var existing = flutterProjectExistingPlatforms(projectPath);
   var missing = platforms
@@ -156,11 +160,13 @@ Future<List<String>> flutterCreatePlatforms(
   }
   var before = _createWatchedPaths(projectPath);
   var pubspec = await pathGetPubspecYamlMap(projectPath);
-  shell = (shell ?? Shell()).cd(projectPath);
+  // Absolute: cd of a relative path is relative to the shell's folder.
+  shell = (shell ?? Shell()).cd(p.absolute(projectPath));
   await shell.run(
     flutterCreatePlatformsCommandLine(
       missing,
       projectName: pubspecYamlGetPackageName(pubspec),
+      template: template,
     ),
   );
   var created = _createWatchedPaths(

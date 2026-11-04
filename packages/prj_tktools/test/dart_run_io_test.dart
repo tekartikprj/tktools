@@ -416,6 +416,10 @@ To run an emulator, run 'flutter emulators --launch <emulator id>'.
       flutterCreatePlatformsCommandLine(['linux'], projectName: 'my_app'),
       'flutter create --platforms linux --no-pub --project-name my_app .',
     );
+    expect(
+      flutterCreatePlatformsCommandLine(['macos'], template: 'app'),
+      'flutter create --template app --platforms macos --no-pub .',
+    );
   });
 
   test(
