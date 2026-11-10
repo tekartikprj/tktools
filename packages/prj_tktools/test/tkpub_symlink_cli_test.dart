@@ -30,7 +30,13 @@ void main() {
   }
 
   setUp(() async {
-    tmp = await Directory.systemTemp.createTemp('tkpub_symlink_');
+    // Resolved: on macOS the temp folder (/var/...) is a link to
+    // /private/var/..., the path the command sees as its working directory.
+    tmp = Directory(
+      (await Directory.systemTemp.createTemp(
+        'tkpub_symlink_',
+      )).resolveSymbolicLinksSync(),
+    );
     appData = join(tmp.path, 'app_data');
     export = join(tmp.path, 'tkpub_export.jsonl');
     // The github top is the folder holding github.com/tekartik
