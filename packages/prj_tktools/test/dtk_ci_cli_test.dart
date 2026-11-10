@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:process_run/shell.dart' show Shell, ShellEnvironment;
 import 'package:tekartik_prj_tktools/src/bin/dtk_ci.dart';
 import 'package:test/test.dart';
 
@@ -18,11 +19,28 @@ void main() {
   late String repoPath;
   late String cliScript;
 
-  Future<ProcessResult> dtk(List<String> arguments) => Process.run(
-    Platform.resolvedExecutable,
-    [cliScript, 'ci', ...arguments],
-    environment: {'TEKARTIK_HOST_CI_DIR': ciDir},
-  );
+  /// Run dart with [arguments]: its result, whatever its exit code, nothing
+  /// shown, no input. [environment] is added to the current one.
+  Future<ProcessResult> dart(
+    List<String> arguments, {
+    ShellEnvironment? environment,
+  }) => Shell(
+    environment: environment,
+    stdin: const Stream<List<int>>.empty(),
+    verbose: false,
+    throwOnError: false,
+  ).runExecutableArguments(Platform.resolvedExecutable, arguments);
+
+  /// Run `dtk ci` with [arguments], the tools of [binDir] (if any) found
+  /// first.
+  Future<ProcessResult> dtk(List<String> arguments, {String? binDir}) {
+    var environment = ShellEnvironment.empty()
+      ..vars['TEKARTIK_HOST_CI_DIR'] = ciDir;
+    if (binDir != null) {
+      environment.paths.prepend(binDir);
+    }
+    return dart([cliScript, 'ci', ...arguments], environment: environment);
+  }
 
   Future<Object?> dtkJson(List<String> arguments) async {
     var result = await dtk([...arguments, '--json']);
@@ -37,7 +55,7 @@ void main() {
     await createGitRepo(repoPath, remote: 'git@github.com:owner/repo.git');
     // Compiled once: a sub process per command.
     cliScript = p.join(topDir.path, 'dtk.dill');
-    var compile = await Process.run(Platform.resolvedExecutable, [
+    var compile = await dart([
       'compile',
       'kernel',
       p.join('test', 'src', 'dtk_cli_main.dart'),
@@ -119,7 +137,7 @@ void main() {
 
   /// True when the real run_ci can run (dev_build activated).
   Future<bool> runCiActivated() async {
-    var version = await Process.run(Platform.resolvedExecutable, [
+    var version = await dart([
       'pub',
       'global',
       'run',
@@ -155,6 +173,45 @@ void main() {
       isTrue,
     );
   }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test(
+    'report --open, context --copy: the page opened, the text copied',
+    () async {
+      // Fake tools, found first: they write what they get in a file.
+      var binDir = Directory(p.join(topDir.path, 'bin'))..createSync();
+      var opened = File(p.join(topDir.path, 'opened.txt'));
+      var copied = File(p.join(topDir.path, 'copied.txt'));
+      Future<void> fakeTool(String name, String script) async {
+        var file = File(p.join(binDir.path, name))
+          ..writeAsStringSync('#!/bin/sh\n$script\n');
+        await Shell(
+          verbose: false,
+        ).runExecutableArguments('chmod', ['+x', file.path]);
+      }
+
+      for (var name in ['xdg-open', 'open']) {
+        await fakeTool(name, 'printf %s "\$1" > \'${opened.path}\'');
+      }
+      for (var name in ['wl-copy', 'xclip', 'pbcopy']) {
+        await fakeTool(name, 'cat > \'${copied.path}\'');
+      }
+      var result = await dtk(['report', '--open'], binDir: binDir.path);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      expect(opened.readAsStringSync(), p.join(ciDir, 'report', 'index.html'));
+
+      // The run of the test before.
+      if (!await runCiActivated()) {
+        return;
+      }
+      result = await dtk(['context', 'repo', '--copy'], binDir: binDir.path);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      expect(result.stdout, contains('analyze'));
+      expect(copied.readAsStringSync(), result.stdout);
+      expect(result.stderr, contains('# copied to the clipboard (wl-copy)'));
+    },
+    testOn: '!windows',
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 
   test('run --next <n>', () async {
     expect(dtkCiNextCount([]), 1);

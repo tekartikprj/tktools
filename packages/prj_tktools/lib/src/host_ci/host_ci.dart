@@ -387,8 +387,7 @@ class HostCi {
         await dir.delete(recursive: true);
       }
       await dir.parent.create(recursive: true);
-      var result = await Process.run(
-        'git',
+      var result = await hostCiRunGit(
         hostCiCloneArguments(link.cloneUrl, root, ref: link.ref),
       );
       if (result.exitCode != 0) {

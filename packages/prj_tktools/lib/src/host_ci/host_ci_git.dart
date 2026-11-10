@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:process_run/shell.dart' show Shell;
 
 /// What git says about a checkout before a run, no network unless fetched.
 class HostCiGitFacts {
@@ -51,11 +52,31 @@ bool hostCiIsGitCheckout(String path) {
   return Directory(gitPath).existsSync() || File(gitPath).existsSync();
 }
 
+/// Run git with [args] in [workingDirectory] (the current one when null):
+/// its result, whatever its exit code, nothing shown. It gets no input (the
+/// end of it at once).
+///
+/// Throws when git cannot start (not found, a missing [workingDirectory]):
+/// process_run's shell then says so on stderr.
+Future<ProcessResult> hostCiRunGit(
+  List<String> args, {
+  String? workingDirectory,
+}) => Shell(
+  workingDirectory: workingDirectory,
+  stdin: const Stream<List<int>>.empty(),
+  verbose: false,
+  throwOnError: false,
+).runExecutableArguments('git', args);
+
 /// Run git in [path], the trimmed stdout, null on a non zero exit code (or
 /// when git cannot run).
 Future<String?> hostCiGit(String path, List<String> args) async {
+  // A folder gone is not worth a message of the shell.
+  if (!Directory(path).existsSync()) {
+    return null;
+  }
   try {
-    var result = await Process.run('git', args, workingDirectory: path);
+    var result = await hostCiRunGit(args, workingDirectory: path);
     if (result.exitCode != 0) {
       return null;
     }

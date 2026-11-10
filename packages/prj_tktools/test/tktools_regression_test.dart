@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:path/path.dart';
+import 'package:process_run/shell.dart' show Shell;
 import 'package:sembast/sembast_memory.dart' show newDatabaseFactoryMemory;
 import 'package:tekartik_app_cv_sembast/app_cv_sembast.dart' hide Finder;
 import 'package:tekartik_prj_tktools/src/bin/tkfind.dart';
@@ -15,6 +16,8 @@ import 'package:tekartik_prj_tktools/src/local_workspace.dart';
 import 'package:tekartik_prj_tktools/src/tkpub/tkpub_deps.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 import 'package:test/test.dart';
+
+import 'src/test_process.dart';
 
 /// Offline regression tests, in temp folders and memory databases only.
 void main() {
@@ -184,11 +187,11 @@ environment:
 ''');
     var locked = Directory(join(tmp.path, 'locked'));
     await locked.create();
-    await Process.run('chmod', ['000', locked.path]);
+    await testRun('chmod', ['000', locked.path]);
     try {
       expect(await DtkProject(tmp.path).getSubProjects(), [pkg.path]);
     } finally {
-      await Process.run('chmod', ['755', locked.path]);
+      await testRun('chmod', ['755', locked.path]);
     }
   }, skip: (Platform.isWindows || _isRoot) ? 'chmod needed' : null);
 
@@ -207,7 +210,11 @@ environment:
 
 bool get _isRoot {
   try {
-    return (Process.runSync('id', ['-u']).stdout as String).trim() == '0';
+    var result = Shell(
+      verbose: false,
+      throwOnError: false,
+    ).runExecutableArgumentsSync('id', ['-u']);
+    return (result.stdout as String).trim() == '0';
   } catch (_) {
     return false;
   }

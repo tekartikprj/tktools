@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:process_run/shell.dart' show Shell, ShellLinesController;
 import 'package:tekartik_app_cv_sdb/app_cv_sdb.dart';
 import 'package:tekartik_prj_tktools/host_ci.dart';
 import 'package:test/test.dart';
@@ -390,23 +391,39 @@ void main() {
     var script = p.absolute(p.join('test', 'src', 'host_ci_queue_main.dart'));
     var release = p.join(topDir.path, 'release');
     var output = <String>[];
-    Future<Process> start(String name, {bool hold = false}) async {
-      var process = await Process.start(Platform.resolvedExecutable, [
-        script,
-        topDir.path,
-        name,
-        if (hold) release,
-      ]);
-      process.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(output.add);
+    // A queue program in a shell of its own: the shell (to kill it) and its
+    // exit code.
+    ({Shell shell, Future<int> exitCode}) start(
+      String name, {
+      bool hold = false,
+    }) {
+      var out = ShellLinesController(encoding: utf8);
+      var err = ShellLinesController(encoding: utf8);
+      // Closed at the end of the test: a killed one may still write.
+      addTearDown(() {
+        out.close();
+        err.close();
+      });
+      out.stream.listen(output.add);
       // The errors too, named: they explain an exit code.
-      process.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) => output.add('$name! $line'));
-      return process;
+      err.stream.listen((line) => output.add('$name! $line'));
+      var shell = Shell(
+        stdout: out.sink,
+        stderr: err.sink,
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        verbose: false,
+        throwOnError: false,
+      );
+      var exitCode = shell
+          .runExecutableArguments(Platform.resolvedExecutable, [
+            script,
+            topDir.path,
+            name,
+            if (hold) release,
+          ])
+          .then((result) => result.exitCode);
+      return (shell: shell, exitCode: exitCode);
     }
 
     Future<void> until(FutureOr<bool> Function() condition) async {
@@ -421,12 +438,12 @@ void main() {
 
     var queue = HostCiRunQueue(topDir.path);
     // The first one holds the slot until released.
-    var first = await start('first', hold: true);
+    var first = start('first', hold: true);
     await until(() => output.contains('first acquired'));
     expect((await queue.readRunning())!.project, 'first');
-    var second = await start('second');
+    var second = start('second');
     await until(() async => (await queue.readState()).waiting.length == 1);
-    var third = await start('third');
+    var third = start('third');
     await until(() async => (await queue.readState()).waiting.length == 2);
     var state = await queue.readState();
     expect(state.running!.project, 'first');
@@ -445,12 +462,14 @@ void main() {
     // Killed while holding the slot: the next one runs anyway.
     File(release).deleteSync();
     output.clear();
-    var killed = await start('killed', hold: true);
+    var killed = start('killed', hold: true);
+    // A killed run throws.
+    killed.exitCode.ignore();
     await until(() => output.contains('killed acquired'));
-    var after = await start('after');
+    var after = start('after');
     await until(() async => (await queue.readState()).waiting.length == 1);
     expect(output, isNot(contains('after acquired')));
-    killed.kill(ProcessSignal.sigkill);
+    expect(killed.shell.kill(ProcessSignal.sigkill), isTrue);
     expect(await after.exitCode, 0, reason: '$output');
     expect(output, contains('after acquired'));
   }, timeout: const Timeout(Duration(minutes: 2)));

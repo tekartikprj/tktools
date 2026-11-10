@@ -4,7 +4,8 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
-import 'package:process_run/shell.dart' show whichSync;
+import 'package:process_run/shell.dart'
+    show Shell, ShellLinesController, ShellOptions, whichSync;
 import 'package:tekartik_prj_tktools/host_ci.dart';
 import 'package:tekartik_prj_tktools/src/process_run_import.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart' show tkPubFindGitTop;
@@ -613,16 +614,34 @@ Future<void> _copyToClipboard(String text) async {
     if (executable == null) {
       continue;
     }
-    var process = await Process.start(executable, command.sublist(1));
-    process.stdin.write(text);
-    await process.stdin.close();
-    // xclip stays alive to serve the selection: do not wait for it.
-    unawaited(process.exitCode);
+    var input = ShellLinesController(encoding: utf8);
+    var done = _quietShell(
+      stdin: input.binaryStream,
+    ).runExecutableArguments(executable, command.sublist(1));
+    // Its whole input, then the end of it.
+    input
+      ..write(text)
+      ..close();
+    await done;
     stderr.writeln('# copied to the clipboard (${command.first})');
     return;
   }
   stderr.writeln('# no clipboard tool found (wl-copy, xclip, pbcopy)');
 }
+
+/// A shell for a command whose output is not read, [stdin] its input: the
+/// run ends when the command exits, whatever it leaves behind. xclip and
+/// wl-copy leave a process serving the selection, a browser may be a child
+/// of the command opening it: both hold the output pipes.
+Shell _quietShell({Stream<List<int>>? stdin}) => Shell(
+  options: ShellOptions(
+    stdin: stdin,
+    verbose: false,
+    throwOnError: false,
+    noStdoutResult: true,
+    noStderrResult: true,
+  ),
+);
 
 class _CiLogCommand extends _CiSubCommand {
   _CiLogCommand()
@@ -707,7 +726,8 @@ class _CiReportCommand extends _CiSubCommand {
             : Platform.isWindows
             ? 'start'
             : 'xdg-open';
-        await Process.start(opener, [index], mode: ProcessStartMode.detached);
+        // Until the opener exits: it hands the page to the browser.
+        await _quietShell().runExecutableArguments(opener, [index]);
       }
     });
     return true;

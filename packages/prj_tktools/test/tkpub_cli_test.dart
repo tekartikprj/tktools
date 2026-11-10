@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:test/test.dart';
 
+import 'src/test_process.dart';
+
 /// tkpub command line tests, run as a sub process in a temp git tree, with
 /// the user prefs in a temp folder (TEKARTIK_PROCESS_RUN_USER_APP_DATA_PATH).
 void main() {
@@ -21,8 +23,7 @@ void main() {
     String? workingDirectory,
     bool configExportPath = true,
   }) {
-    return Process.run(
-      Platform.resolvedExecutable,
+    return testRunDart(
       [
         cliScript,
         if (configExportPath) '--config-export-path=$export',
@@ -71,9 +72,9 @@ dependency_overrides:
   c_pkg:
     path: ../c_pkg
 ''');
-    await Process.run('git', ['init', '-q'], workingDirectory: repoPath);
+    await testRun('git', ['init', '-q'], workingDirectory: repoPath);
     // Path dependencies only, offline.
-    var result = await Process.run(Platform.resolvedExecutable, [
+    var result = await testRunDart([
       'pub',
       'get',
       '--offline',

@@ -3,7 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:process_run/shell.dart' show ShellEnvironment, ShellProcesses;
+import 'package:process_run/shell.dart'
+    show Shell, ShellEnvironment, ShellLinesController, ShellProcesses;
+
+/// The encoding of the output of a process: UTF-8, a malformed sequence
+/// replaced instead of failing the run (or losing its line).
+const _outputEncoding = Utf8Codec(allowMalformed: true);
 
 /// A started process, its output as lines.
 abstract class HostCiProcess {
@@ -41,12 +46,15 @@ abstract class HostCiProcessStarter {
   Future<String?> readFlutterVersion();
 }
 
-/// Starts real processes.
+/// Starts real processes, each one the command of a process_run [Shell] of
+/// its own (its output through two [ShellLinesController]).
 ///
 /// The executable is resolved through process_run's shell environment (the
 /// user `env.yaml` paths: nvm's node, flutter, Android tools). Killing a
 /// process kills its whole tree (`ShellProcesses`, by parent pid): `flutter
-/// test` spawns `dart test`, which spawns chrome or node.
+/// test` spawns `dart test`, which spawns chrome or node. Not `Shell.kill`:
+/// it ends the run of the shell at once, where a run waits for the exit code
+/// of the process killed and for the end of its output.
 ///
 /// Where `setsid` is found (Linux, not macOS), the process gets its own
 /// session and process group: away from the terminal of `dtk ci` (ctrl-c
@@ -79,22 +87,49 @@ class HostCiIoProcessStarter implements HostCiProcessStarter {
       );
     }
     var setsid = _useProcessGroup ? environment.whichSync('setsid') : null;
-    var process = setsid != null
-        ? await Process.start(
-            setsid,
-            [resolved, ...arguments],
-            workingDirectory: workingDirectory,
-            environment: environment,
-            includeParentEnvironment: false,
+    var out = ShellLinesController(encoding: _outputEncoding);
+    var err = ShellLinesController(encoding: _outputEncoding);
+    var shell = Shell(
+      workingDirectory: workingDirectory,
+      environment: environment,
+      includeParentEnvironment: false,
+      stdoutEncoding: _outputEncoding,
+      stderrEncoding: _outputEncoding,
+      stdout: out.sink,
+      stderr: err.sink,
+      verbose: false,
+      throwOnError: false,
+    );
+    var started = Completer<Process>();
+    // Not awaited: the run ends once the process exited and its output was
+    // read to its end (the pipes closed: a descendant may hold them longer),
+    // the lines end then.
+    unawaited(
+      shell
+          .runExecutableArguments(setsid ?? resolved, [
+            if (setsid != null) resolved,
+            ...arguments,
+          ], onProcess: (process) => started.complete(process))
+          .then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              // It could not start (the working directory is missing).
+              if (!started.isCompleted) {
+                started.completeError(error, stackTrace);
+              }
+            },
           )
-        : await Process.start(
-            resolved,
-            arguments,
-            workingDirectory: workingDirectory,
-            environment: environment,
-            includeParentEnvironment: false,
-          );
-    return _IoProcess(process, processGroup: setsid != null);
+          .whenComplete(() {
+            out.close();
+            err.close();
+          }),
+    );
+    return _ShellProcess(
+      await started.future,
+      processGroup: setsid != null,
+      out: out,
+      err: err,
+    );
   }
 
   @override
@@ -116,16 +151,29 @@ class HostCiIoProcessStarter implements HostCiProcessStarter {
   }
 }
 
-class _IoProcess implements HostCiProcess {
+/// The command of a [Shell], running.
+class _ShellProcess implements HostCiProcess {
+  /// The process, as the shell gives it when it starts (`onProcess`).
   final Process process;
 
   /// True when the process is the leader of its own process group.
   final bool processGroup;
 
+  /// The output of the shell, closed at the end of its run.
+  final ShellLinesController out;
+
+  /// The errors of the shell, closed at the end of its run.
+  final ShellLinesController err;
+
   /// True once exited.
   var _exited = false;
 
-  _IoProcess(this.process, {required this.processGroup}) {
+  _ShellProcess(
+    this.process, {
+    required this.processGroup,
+    required this.out,
+    required this.err,
+  }) {
     unawaited(
       process.exitCode.then((_) {
         _exited = true;
@@ -137,15 +185,13 @@ class _IoProcess implements HostCiProcess {
   int get pid => process.pid;
 
   @override
-  Stream<String> get stdoutLines => process.stdout
-      .transform(const Utf8Decoder(allowMalformed: true))
-      .transform(const LineSplitter());
+  Stream<String> get stdoutLines => out.stream;
 
   @override
-  Stream<String> get stderrLines => process.stderr
-      .transform(const Utf8Decoder(allowMalformed: true))
-      .transform(const LineSplitter());
+  Stream<String> get stderrLines => err.stream;
 
+  /// The one of the process, not of the run of the shell: that one comes
+  /// with the end of the output, which a descendant left behind holds.
   @override
   Future<int> get exitCode => process.exitCode;
 

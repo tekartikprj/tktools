@@ -17,7 +17,7 @@ void deleteDir(Directory dir) {
 
 /// Run git in [path], throws on a non zero exit code.
 Future<String> git(String path, List<String> args) async {
-  var result = await Process.run('git', [
+  var result = await hostCiRunGit([
     '-c',
     'user.name=Test',
     '-c',

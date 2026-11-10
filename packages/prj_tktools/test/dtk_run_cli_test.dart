@@ -5,7 +5,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:process_run/shell.dart' show Shell, ShellLinesController;
 import 'package:test/test.dart';
+
+import 'src/test_process.dart';
 
 /// `dtk run` and `dtk test` command line tests, run as a sub process in a
 /// fixture project (a fake Flutter SDK in its package config), no device
@@ -26,8 +29,7 @@ void main() {
     List<String> arguments, {
     String? workingDirectory,
     Map<String, String>? environment,
-  }) => Process.run(
-    Platform.resolvedExecutable,
+  }) => testRunDart(
     [cliScript, ...arguments],
     workingDirectory: workingDirectory ?? app,
     environment: {
@@ -99,7 +101,7 @@ void main() {
       "void main(List<String> args) => print('hello \${args.join(',')}');",
     );
     write('hello/tool/fail.dart', "import 'dart:io';\nvoid main() => exit(3);");
-    var pubGet = await Process.run(Platform.resolvedExecutable, [
+    var pubGet = await testRunDart([
       'pub',
       'get',
       '--offline',
@@ -107,7 +109,7 @@ void main() {
     expect(pubGet.exitCode, 0, reason: '${pubGet.stderr}');
     // Compiled once: a sub process per command.
     cliScript = p.join(topDir.path, 'dtk.dill');
-    var compile = await Process.run(Platform.resolvedExecutable, [
+    var compile = await testRunDart([
       'compile',
       'kernel',
       p.join('test', 'src', 'dtk_cli_main.dart'),
@@ -241,17 +243,29 @@ void main() {
     expect(result.stdout, contains('1. lib/main.dart (flutter)'));
     expect(result.stderr, contains('No entry chosen (no input)'));
     // Picked on stdin.
-    var process = await Process.start(Platform.resolvedExecutable, [
-      cliScript,
-      'run',
-      'main',
-      '--dry-run',
-    ], workingDirectory: app);
-    process.stdin.writeln('2');
-    await process.stdin.close();
-    var out = await process.stdout.transform(utf8.decoder).join();
-    expect(await process.exitCode, 0);
-    expect(out, endsWith('dart run lib/main_cli.dart\n'));
+    var input = ShellLinesController();
+    var output = ShellLinesController();
+    var done =
+        Shell(
+          workingDirectory: app,
+          stdin: input.binaryStream,
+          stdout: output.sink,
+          verbose: false,
+          throwOnError: false,
+        ).runExecutableArguments(Platform.resolvedExecutable, [
+          cliScript,
+          'run',
+          'main',
+          '--dry-run',
+        ]);
+    var out = output.stream.toList();
+    input
+      ..writeln('2')
+      ..close();
+    var picked = await done;
+    output.close();
+    expect(picked.exitCode, 0);
+    expect((await out).join('\n'), endsWith('dart run lib/main_cli.dart'));
   });
 
   test('run: errors', () async {

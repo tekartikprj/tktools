@@ -14,6 +14,7 @@ import 'package:test/test.dart';
 
 import 'src/dtk_test_tree.dart';
 import 'src/test_kernel.dart';
+import 'src/test_process.dart';
 
 /// dtk command line tests, run as a sub process on a temp git tree, with the
 /// user prefs in a temp folder (TEKARTIK_PROCESS_RUN_USER_APP_DATA_PATH).
@@ -23,8 +24,7 @@ void main() {
   late String cliProgram;
 
   Future<ProcessResult> dtk(List<String> arguments) {
-    return Process.run(
-      Platform.resolvedExecutable,
+    return testRunDart(
       [
         cliProgram,
         '--git-top=${tree.gitTop}',
@@ -130,7 +130,7 @@ void main() {
     // Local repositories registered under github.com ids (offline): a bare
     // one that clones and a missing one that fails.
     var origin = join(tree.tmp.path, 'origin.git');
-    await Process.run('git', ['init', '-q', '--bare', origin]);
+    await testRun('git', ['init', '-q', '--bare', origin]);
     await dtkGitConfigDbAction<void>(
       (db) async {
         for (var (id, gitUrl) in [
