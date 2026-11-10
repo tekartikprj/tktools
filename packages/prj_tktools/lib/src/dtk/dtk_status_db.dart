@@ -206,12 +206,32 @@ class DtkStatusDb {
     return await _timepointQueryRef.getRecord(txn);
   }
 
+  /// The current timepoint (see [setCurrentTimepoint]), else the last one,
+  /// created when none.
   Future<DbDtkTimepoint> _getOrCreateLastTimepoint(
     Transaction txn, {
     Timestamp? now,
   }) async {
+    var currentId = await _getConfigCurrentTimepointId(txn);
+    if (currentId != null) {
+      var current = await dbDtkTimepointStore.record(currentId).get(txn);
+      if (current != null) {
+        return current;
+      }
+    }
     return await _timepointQueryRef.getRecord(txn) ??
         _createTimepoint(txn, now: now);
+  }
+
+  /// Delete the actions of the timepoint [id]: a later timepoint can get the
+  /// same id (sembast reuses the last int key once the file is compacted).
+  Future<void> _deleteTimepointActions(Transaction txn, int id) async {
+    await dbDtkActionStore.delete(
+      txn,
+      finder: Finder(
+        filter: Filter.equals(dbDtkActionModel.timepoint.name, id),
+      ),
+    );
   }
 
   /// Find when done for sub task
@@ -473,9 +493,13 @@ class DtkStatusDb {
           ),
         ),
       );
+      var currentTimepointId = await _getConfigCurrentTimepointId(txn);
       for (var timepoint in timepoints) {
         await dbDtkTimepointStore.record(timepoint.id).delete(txn);
-        // TODO delete other things
+        await _deleteTimepointActions(txn, timepoint.id);
+        if (timepoint.id == currentTimepointId) {
+          await _setCurrentTimepointId(txn, null);
+        }
       }
       return timepoints.length;
     });
@@ -499,6 +523,7 @@ class DtkStatusDb {
         await _setCurrentTimepointId(txn, null);
       }
       await dbDtkTimepointStore.record(id).delete(txn);
+      await _deleteTimepointActions(txn, id);
     });
   }
 }

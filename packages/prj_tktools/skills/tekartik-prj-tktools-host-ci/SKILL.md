@@ -20,7 +20,7 @@ and read everything.
 
 ## Guidelines
 
-- Read before running: `dtk ci --json` (status), `dtk ci next --json`,
+- Read before running: `dtk ci status --json`, `dtk ci next --json`,
   `dtk ci failures --json`. A run takes the machine for minutes (one run at a
   time, the others wait in the queue: `dtk ci queue`).
 - Run: `dtk ci run <project>` (id, `owner/repo`, repo name or path),
@@ -52,8 +52,10 @@ and read everything.
   (a warning, the next steps run) or `accept`; `fail` restores the default.
   Skip a project (`dtk ci skip <project>`) or a platform
   (`--platform host|web`: its test and build steps).
-- The run happens on the checkout as it is (dirty trees run, flagged): pub
-  upgrade rewrites the lock files, the downgrade puts them back.
+- The run happens on the checkout as it is (dirty trees run, flagged): the
+  pub upgrade rewrites the lock files and its changes stay; the downgrade
+  (`--no-override`: `pubspec_overrides.yaml` ignored) is undone, the lock
+  files of the upgrade put back.
 - The downgrade analyze fails on errors only (`run_ci --no-fatal-warnings`,
   dev_build 1.1.17+3; an older `run_ci` makes its warnings fatal, the log
   says so).
@@ -102,4 +104,6 @@ Future<void> main() async {
 
 Tests: `HostCi.open(dir: tmp, factory: newSdbFactoryMemory(), lock:
 HostCiMemoryLock(), starter: HostCiFakeProcessStarter(...))` runs without real
-processes (and without file locks, for widget tests in a fake async zone).
+processes and keeps the database without file locks; `run()` still takes the
+machine slot through the run queue files in `dir` (real IO: `runAsync` in a
+widget test) and writes the report pages unless `writeReport: false`.

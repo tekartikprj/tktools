@@ -225,9 +225,28 @@ class HostCiRepoLink {
       '$cloneUrl${ref == null ? '' : ' $ref'}${subPath == null ? '' : ' $subPath'}';
 }
 
+/// True for a plain folder name of a link: not `.` nor `..`, no separator
+/// (a link never points outside the checkouts folder).
+bool _isPlainSegment(String segment) =>
+    segment.isNotEmpty &&
+    segment != '.' &&
+    segment != '..' &&
+    !segment.contains('/') &&
+    !segment.contains(r'\');
+
 /// The repository link of [text] (see [HostCiRepoLink]), null when it is not
-/// one (a local path for example).
+/// one (a local path for example, or a `..` in it).
 HostCiRepoLink? hostCiParseRepoLink(String text) {
+  var link = _parseRepoLink(text);
+  if (link == null ||
+      !link.repoIdParts.every(_isPlainSegment) ||
+      !(link.subPath?.split('/').every(_isPlainSegment) ?? true)) {
+    return null;
+  }
+  return link;
+}
+
+HostCiRepoLink? _parseRepoLink(String text) {
   var link = text.trim();
   if (link.isEmpty) {
     return null;

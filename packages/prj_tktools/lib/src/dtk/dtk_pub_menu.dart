@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dev_build/menu/menu_io.dart';
 
 import 'package:tekartik_common_utils/common_utils_import.dart';
-import 'package:tekartik_prj_tktools/src/dtk/dtk_dep_config_db.dart';
 import 'package:tekartik_prj_tktools/src/tkpub_db.dart';
 import 'package:tekartik_prj_tktools/src/utils.dart';
 import 'package:tekartik_prj_tktools/tkpub.dart';
@@ -30,7 +29,7 @@ void dtkPubMenu() {
       var newRef = await prompt('ref (default: ${config.gitRef.v})');
       if (newRef.isNotEmpty) {
         config.gitRef.v = newRef;
-        await dtkDepConfigDbAction(
+        await tkPubDbAction(
           (db) async {
             await db.setConfig(config);
           },
@@ -57,7 +56,7 @@ void dtkPubMenu() {
           ..gitUrl.v = gitUrl
           ..gitPath.setValue(gitPath.isEmpty ? null : gitPath);
         await db.setPackage(package, newPackage);
-      });
+      }, write: true);
     });
     item('check local dirs', () async {
       var gitTop = await tkPubFindGithubTop();

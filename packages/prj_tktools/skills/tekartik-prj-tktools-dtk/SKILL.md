@@ -50,8 +50,11 @@ VM only (`dart:io`, shells, prefs on disk).
 ### The dtk command line (lookups)
 
 * Prefer it to reading the JSONL exports: it joins the git registry and the
-  tkpub registry and resolves the local paths. Read only, except `sync
-  --clone`. Every command but `path` takes `--json`; errors go to stderr with
+  tkpub registry and resolves the local paths. The lookups (repos, repo,
+  packages, package, path, sync) are read only, except `sync --clone`; of
+  `run`/`test`, only `run --create-platform` writes in the project (the
+  platform folder, `.metadata` restored). The lookups but `path`, and
+  `devices`, take `--json`; errors go to stderr with
   exit code 1.
 * The executable comes from the tools package installed globally next to
   `tkpub` (`which dtk`); this package only exports `dtkMain(arguments)`, the
@@ -82,7 +85,8 @@ VM only (`dart:io`, shells, prefs on disk).
   not know.
 * Global options, before the command: `--git-top`,
   `--git-config-export-path`, `--pub-config-export-path` (default: global
-  prefs, `TEKARTIK_GIT_TOP` or the folder holding the nearest `github.com`).
+  prefs, `TEKARTIK_GIT_TOP`, else the nearest folder holding
+  `github.com/tekartik`, else the trees of the registry exports).
 * From Dart: `DtkRegistry.load(gitTop:, gitConfigExportPath:,
   pubConfigExportPath:, requirePackages:)`, then `repos`, `packages`,
   `findRepos(query)`, `findPackage(name)`, `packagesInRepo(id)`,
@@ -177,8 +181,9 @@ VM only (`dart:io`, shells, prefs on disk).
   membership: `createEmptyProject(projectName: ...)`,
   `createWorkspaceRootProject()`, `addToWorkspace()`, `removeFromWorkspace()`.
   They rewrite `pubspec.yaml` in place (adding `resolution: workspace` and the
-  relative path in the root `workspace:` list) and are guarded by a lock, so
-  several projects can be added concurrently.
+  relative path in the root `workspace:` list) and are guarded by an
+  in-process lock: several projects can be added concurrently by one process
+  (two processes can still lose an update).
 * Anti-patterns: mutating a database without `write: true`; keeping a
   `DtkConfigDb` after the action returned (it is closed); storing a real secret
   with `dsUserEnvSetEncryptedVar`; assuming `dtkGitGetAllRepositories` skips

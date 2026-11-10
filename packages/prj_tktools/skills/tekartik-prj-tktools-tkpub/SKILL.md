@@ -58,7 +58,7 @@ Everything here is VM only (`dart:io`, shells, symlinks).
   | `add [dev:\|override:\|pubspec_overrides:]<pkg>...` | add to the current pubspec |
   | `remove <pkg>...`, `clear` | remove dependencies |
   | `list` | list the dependencies of the current package |
-  | `symlink <pkg\|giturl>...` | symlink the package locally |
+  | `symlink <pkg\|giturl>...` | link `<owner>/<repo>[/<path>]` in the current folder to the package (an existing link is replaced, an existing folder refused: never run it from the git top) |
   | `copy_files <pkg> <file>... [--dir <dir>]` | copy files out of a package |
 
 * `add` flags: `--dev`/`-d`, `--direct`, `--overrides`/`-o` (into

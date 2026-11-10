@@ -375,7 +375,12 @@ class HostCi {
   /// Returns the existing project when it is already there; throws when the
   /// clone fails or the sub folder is not in the repository.
   Future<DbHostCiProject> addClone(HostCiRepoLink link) async {
-    var root = p.joinAll([await getCheckoutsDir(), ...link.repoIdParts]);
+    var checkoutsDir = await getCheckoutsDir();
+    var root = p.joinAll([checkoutsDir, ...link.repoIdParts]);
+    // Never outside the checkouts folder (a `..` in a link).
+    if (!p.isWithin(checkoutsDir, p.normalize(root))) {
+      throw ArgumentError('Not a repository link: $link');
+    }
     if (!hostCiIsGitCheckout(root)) {
       var dir = Directory(root);
       if (dir.existsSync()) {
@@ -735,15 +740,16 @@ class HostCi {
         'A run is in progress (${_runner?.project.id ?? 'waiting'})',
       );
     }
-    var project = await store.getProject(projectId);
-    if (project == null) {
-      throw StateError('Unknown project $projectId');
-    }
-    String? stepsSignature;
+    // Busy at once, before any await (a second call throws), and a cancel
+    // is kept until the runner exists.
     var waitCancel = _waitCancel = Completer<void>();
-    HostCiRunSlot slot;
     try {
-      slot = await queue.acquire(
+      var project = await store.getProject(projectId);
+      if (project == null) {
+        throw StateError('Unknown project $projectId');
+      }
+      String? stepsSignature;
+      var slot = await queue.acquire(
         HostCiQueueEntry(
           pid: pid,
           project: projectId,
@@ -754,59 +760,63 @@ class HostCi {
         onWaiting: onWaiting,
         cancel: waitCancel.future,
       );
+      try {
+        // Read again: it may have changed while waiting.
+        project = await store.getProject(projectId) ?? project;
+        var settings = await store.getSettings();
+        var steps = only != null
+            ? hostCiNormalizeSteps(only)
+            : from != null
+            ? hostCiStepsFrom(project, from)
+            : null;
+        var runner = _runner = HostCiRunner(
+          store: store,
+          logsDir: logsDir,
+          starter: starter,
+          project: project,
+          trigger: trigger,
+          settings: settings,
+          client: client,
+          steps: steps,
+          partial: only != null
+              ? HostCiPartial.only
+              : from != null
+              ? HostCiPartial.from
+              : null,
+          onLines: onLines,
+          onRun: (run) {
+            onRun?.call(run);
+            // The pages follow the steps.
+            var signature = run.stepList.map((step) => step.status.v).join();
+            if (signature != stepsSignature) {
+              stepsSignature = signature;
+              _scheduleReport(run, index: true);
+            }
+          },
+          onAdded: (run) async {
+            await slot.setRunId(run.id);
+            _changed();
+          },
+          now: now,
+        );
+        if (waitCancel.isCompleted) {
+          // Cancelled once the slot taken, before the runner existed.
+          runner.cancel();
+        }
+        _changed();
+        var run = await runner.start();
+        _runner = null;
+        await slot.release();
+        _scheduleReport(run, index: true, project: true);
+        await _reportWrite;
+        return run;
+      } finally {
+        _runner = null;
+        await slot.release();
+        _changed();
+      }
     } finally {
       _waitCancel = null;
-    }
-    try {
-      // Read again: it may have changed while waiting.
-      project = await store.getProject(projectId) ?? project;
-      var settings = await store.getSettings();
-      var steps = only != null
-          ? hostCiNormalizeSteps(only)
-          : from != null
-          ? hostCiStepsFrom(project, from)
-          : null;
-      var runner = _runner = HostCiRunner(
-        store: store,
-        logsDir: logsDir,
-        starter: starter,
-        project: project,
-        trigger: trigger,
-        settings: settings,
-        client: client,
-        steps: steps,
-        partial: only != null
-            ? HostCiPartial.only
-            : from != null
-            ? HostCiPartial.from
-            : null,
-        onLines: onLines,
-        onRun: (run) {
-          onRun?.call(run);
-          // The pages follow the steps.
-          var signature = run.stepList.map((step) => step.status.v).join();
-          if (signature != stepsSignature) {
-            stepsSignature = signature;
-            _scheduleReport(run, index: true);
-          }
-        },
-        onAdded: (run) async {
-          await slot.setRunId(run.id);
-          _changed();
-        },
-        now: now,
-      );
-      _changed();
-      var run = await runner.start();
-      _runner = null;
-      await slot.release();
-      _scheduleReport(run, index: true, project: true);
-      await _reportWrite;
-      return run;
-    } finally {
-      _runner = null;
-      await slot.release();
-      _changed();
     }
   }
 

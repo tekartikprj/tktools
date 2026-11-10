@@ -255,7 +255,14 @@ class HostCiRunQueue {
 
   static var _ticketCount = 0;
 
+  /// The probes and takes of the run lock in this process, one at a time per
+  /// folder: probing it (open, lock, unlock, close) while this process holds
+  /// it would release it (a file lock is per process).
+  static final _runLockMutexes = <String, Lock>{};
+
   String get _key => p.normalize(p.absolute(dir));
+
+  Lock get _runLockMutex => _runLockMutexes[_key] ??= Lock();
 
   /// The slot held by this process, null when none.
   HostCiRunSlot? get heldSlot => _held[_key];
@@ -309,10 +316,19 @@ class HostCiRunQueue {
         }
         var tickets = await _liveTickets();
         if (tickets.isNotEmpty && tickets.first.ticket == name) {
-          var runRaf = await _tryLock(File(runLockPath));
-          if (runRaf != null) {
-            var slot = HostCiRunSlot._(this, runRaf, entry);
-            _held[_key] = slot;
+          var slot = await _runLockMutex.synchronized(() async {
+            // Held by another wait of this process (its file lock would not
+            // exclude this one): after it.
+            if (heldSlot != null) {
+              return null;
+            }
+            var runRaf = await _tryLock(File(runLockPath));
+            if (runRaf == null) {
+              return null;
+            }
+            return _held[_key] = HostCiRunSlot._(this, runRaf, entry);
+          });
+          if (slot != null) {
             await _writeRunning(entry);
             await dropTicket();
             return slot;
@@ -373,21 +389,23 @@ class HostCiRunQueue {
     }
   }
 
-  Future<void> _release(HostCiRunSlot slot) async {
-    if (_held[_key] != slot) {
-      return;
-    }
-    _held.remove(_key);
-    try {
-      await File(runningPath).delete();
-    } catch (_) {}
-    try {
-      await slot._raf.unlock();
-    } catch (_) {}
-    try {
-      await slot._raf.close();
-    } catch (_) {}
-  }
+  Future<void> _release(HostCiRunSlot slot) =>
+      _runLockMutex.synchronized(() async {
+        if (_held[_key] != slot) {
+          return;
+        }
+        try {
+          await File(runningPath).delete();
+        } catch (_) {}
+        try {
+          await slot._raf.unlock();
+        } catch (_) {}
+        try {
+          await slot._raf.close();
+        } catch (_) {}
+        // Once unlocked: a take of this process waits until then.
+        _held.remove(_key);
+      });
 
   /// The live tickets, the oldest first; the tickets of dead processes are
   /// deleted.
@@ -458,35 +476,35 @@ class HostCiRunQueue {
 
   /// The run in progress on this machine, null when none (a running file
   /// left by a dead process is ignored).
-  Future<HostCiQueueEntry?> readRunning() async {
-    var held = heldSlot;
-    if (held != null) {
-      return held.entry;
-    }
-    var file = File(runningPath);
-    if (!file.existsSync()) {
-      return null;
-    }
-    // Probe the run lock: free means nobody runs.
-    var raf = await _tryLock(File(runLockPath));
-    if (raf != null) {
-      try {
-        if (heldSlot == null) {
-          await file.delete();
-        }
-      } catch (_) {
-      } finally {
-        await raf.unlock();
-        await raf.close();
+  Future<HostCiQueueEntry?> readRunning() => _runLockMutex.synchronized(
+    () async {
+      var held = heldSlot;
+      if (held != null) {
+        return held.entry;
       }
-      return null;
-    }
-    try {
-      return HostCiQueueEntry.fromJson(jsonDecode(await file.readAsString()));
-    } catch (_) {
-      return null;
-    }
-  }
+      var file = File(runningPath);
+      if (!file.existsSync()) {
+        return null;
+      }
+      // Probe the run lock: free means nobody runs.
+      var raf = await _tryLock(File(runLockPath));
+      if (raf != null) {
+        try {
+          await file.delete();
+        } catch (_) {
+        } finally {
+          await raf.unlock();
+          await raf.close();
+        }
+        return null;
+      }
+      try {
+        return HostCiQueueEntry.fromJson(jsonDecode(await file.readAsString()));
+      } catch (_) {
+        return null;
+      }
+    },
+  );
 
   /// The run in progress and the waiting ones.
   Future<HostCiQueueState> readState({List<HostCiQueueEntry>? tickets}) async {

@@ -1,4 +1,7 @@
 @TestOn('vm')
+// Each `tkpub` command compiles example/tkpub.dart: a test running 3 of them
+// exceeds the default 30 s while other test files run in parallel.
+@Timeout(Duration(minutes: 2))
 library;
 
 import 'dart:io';

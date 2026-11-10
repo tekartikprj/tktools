@@ -30,7 +30,14 @@ void main() {
     Platform.resolvedExecutable,
     [cliScript, ...arguments],
     workingDirectory: workingDirectory ?? app,
-    environment: environment,
+    environment: {
+      // Not the user's process_run env (TK_FLUTTER_DEVICE_ID set by fdm).
+      'TEKARTIK_PROCESS_RUN_USER_APP_DATA_PATH': p.join(
+        topDir.path,
+        'app_data',
+      ),
+      ...?environment,
+    },
   );
 
   /// The stdout of a successful dtk call.

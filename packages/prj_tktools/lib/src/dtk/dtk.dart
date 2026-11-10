@@ -83,6 +83,11 @@ class DtkGitRepositoryRef {
 
   /// Creates a [DtkGitRepositoryRef] parsed from the given git [gitUrl].
   DtkGitRepositoryRef.fromUrl(String gitUrl) {
+    // A trailing slash (copied from a browser) is not part of the name.
+    gitUrl = gitUrl.trim();
+    while (gitUrl.endsWith('/')) {
+      gitUrl = gitUrl.substring(0, gitUrl.length - 1);
+    }
     List<String> parts;
     String host;
     if (gitUrl.startsWith('git@')) {

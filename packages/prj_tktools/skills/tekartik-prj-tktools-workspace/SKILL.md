@@ -84,9 +84,10 @@ VM only (`dart:io`, symlinks, shells).
 * Symlinks: `localWorkspaceDoAdd(packageName, workspacePath, githubTop)` links
   the package folder inside its repo, `localWorkspaceDoAddGit(...)` links the
   whole repo, and both call `localWorkspaceCreateSymlink(absoluteLinkPath,
-  localTarget)`, which deletes an existing link first. `doAdd` throws when a
-  repo-level link created by `add-git` already covers the path: pick one style
-  per repo. Get `githubTop` from `tkPubFindGithubTop()` (tkpub skill).
+  localTarget)`, which deletes whatever is at the link path first (a link,
+  but also a real folder, recursively: keep `projects/` for the links).
+  `doAdd` throws when a repo-level link created by `add-git` already covers
+  the path: pick one style per repo. Get `githubTop` from `tkPubFindGithubTop()` (tkpub skill).
 * The workspace root itself (`.`) is always the first resolved folder. Never
   commit the `projects/` symlinks or `.local/`.
 

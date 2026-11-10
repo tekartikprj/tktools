@@ -27,8 +27,9 @@ dtk sync [--tag main] [--clone]          # missing clones, unregistered checkout
 The registries are private data: `dtk` reads the export paths set once in the
 global prefs (`tkpub init <export>`, dtk menu "set git config path"), or the
 `--git-config-export-path` / `--pub-config-export-path` options. The git top is
-`--git-top`, else `TEKARTIK_GIT_TOP`, else the folder holding the nearest
-`github.com`. From Dart: `DtkRegistry.load()` in `package:tekartik_prj_tktools/dtk.dart`.
+`--git-top`, else `TEKARTIK_GIT_TOP`, else the nearest folder holding
+`github.com/tekartik` (from the current one, then the folders of the registry
+exports). From Dart: `DtkRegistry.load()` in `package:tekartik_prj_tktools/dtk.dart`.
 
 ## Run and test (`dtk run`, `dtk test`, `dtk devices`)
 
@@ -65,7 +66,10 @@ device too. When it is missing, `dtk run` and `dtk test` fail before running
 flutter, unless `--create-platform` creates it: `flutter create --platforms
 <platform> --no-pub --project-name <pubspec name> .`, everything else it adds
 to an existing project (`lib/main.dart`, `test/widget_test.dart`, `.idea/`,
-`<name>.iml`, `.metadata`, `README.md`...) removed.
+`<name>.iml`, `.metadata`, `README.md`...) removed, an existing `.metadata`
+put back as it was (also when `flutter create` fails). Do not run it while
+another tool (the IDE, `build_runner watch`) writes in the project: a file it
+creates meanwhile is removed too.
 
 From Dart: `package:tekartik_prj_tktools/dart_run.dart` (`scanDartRunEntries`,
 `DartImportScanner`, `dartRunCommandLine`, `getDartRunDevices`,
@@ -89,7 +93,7 @@ previous ones (a failing step skips the next ones).
 | test web | `--test --no-vm-test --no-pub-get` (chrome, node) |
 | build web | `--build --no-pub-get` |
 | build host | not `run_ci`: Host CI runs `flutter build linux` (`macos`, `windows`) `--no-pub` in each flutter app having the platform folder and `lib/main.dart` |
-| pub downgrade, analyze downgrade, pub restore | `--pub-downgrade`, `--analyze --no-fatal-warnings` on the lowest versions (errors only: their warnings are reported, the analyze step checks the latest ones; `run_ci` 1.1.17+3, the flag dropped for an older one), then the lock files put back and `--pub-get` |
+| pub downgrade, analyze downgrade, pub restore | `--pub-downgrade --no-override`, `--analyze --no-fatal-warnings --no-pub-get --no-override` on the lowest versions (`pubspec_overrides.yaml` ignored) (errors only: their warnings are reported, the analyze step checks the latest ones; `run_ci` 1.1.17+3, the flag dropped for an older one), then the lock files of the upgrade put back and `--pub-get --no-override` |
 
 ```bash
 dtk ci add [<path|owner/repo>...]       # follow checkouts (the current folder)

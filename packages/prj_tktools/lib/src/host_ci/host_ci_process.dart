@@ -137,12 +137,14 @@ class _IoProcess implements HostCiProcess {
   int get pid => process.pid;
 
   @override
-  Stream<String> get stdoutLines =>
-      process.stdout.transform(utf8.decoder).transform(const LineSplitter());
+  Stream<String> get stdoutLines => process.stdout
+      .transform(const Utf8Decoder(allowMalformed: true))
+      .transform(const LineSplitter());
 
   @override
-  Stream<String> get stderrLines =>
-      process.stderr.transform(utf8.decoder).transform(const LineSplitter());
+  Stream<String> get stderrLines => process.stderr
+      .transform(const Utf8Decoder(allowMalformed: true))
+      .transform(const LineSplitter());
 
   @override
   Future<int> get exitCode => process.exitCode;

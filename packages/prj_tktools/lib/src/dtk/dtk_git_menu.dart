@@ -50,9 +50,8 @@ abstract class DtkActionRunner<T extends DbDtkAction> {
 
   /// Init once
   Future<void> _init() async {
-    var concurrency = (await db.getExecutionConcurrency() ?? 1);
-    // print('concurrency: $concurrency');
-    _poolOrNull ??= Pool(concurrency);
+    var concurrency = await db.getExecutionConcurrency();
+    _poolOrNull ??= Pool(concurrency ?? _defaultConcurrency);
   }
 
   /// Creates a [DtkActionRunner] with [db] database and [action].
@@ -206,7 +205,7 @@ class DtkDartProjectActionRunner
       var findDartProjectAction = await db.getFindDartProjectAction(repo: repo);
       for (var path in findDartProjectAction.dartProjects.v!) {
         futures.add(
-          _pool.withResource(() async {
+          _poolOrNull!.withResource(() async {
             await shellStdioLinesGrouper.runZoned(() async {
               var dbRepoPath = join(repo, path);
               var projectPath = join(gitTop, dbRepoPath);
@@ -263,8 +262,11 @@ class DtkDartProjectActionRunner
   }
 }
 
-/// ! (might need decrease)
-Pool _pool = Pool(Platform.isLinux || Platform.isMacOS ? 50 : 1);
+/// The concurrency of the project actions when none is set (execution menu).
+final _defaultConcurrency = Platform.isLinux || Platform.isMacOS ? 50 : 1;
+
+/// The pool of the project actions, set from the execution concurrency
+/// ([DtkActionRunner.findMainAction]), reset when it changes.
 Pool? _poolOrNull;
 
 /// dtk find dart project action runner

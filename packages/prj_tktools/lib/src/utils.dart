@@ -80,13 +80,17 @@ String findGithubTop(String dirPath) {
 /// Find tekartik github top
 String? _findGithubTopOrNull(String dirPath) {
   var dir = Directory(normalize(dirPath)).absolute;
-  while (dir.path != '/') {
+  while (true) {
     if (Directory(join(dir.path, 'github.com', 'tekartik')).existsSync()) {
       return join(dir.path, 'github.com');
     }
-    dir = dir.parent;
+    var parent = dir.parent;
+    // The parent of a root (`/`, `C:\` on Windows) is the root itself.
+    if (parent.path == dir.path) {
+      return null;
+    }
+    dir = parent;
   }
-  return null;
 }
 
 /// Get the local path of a dependency (absolute)

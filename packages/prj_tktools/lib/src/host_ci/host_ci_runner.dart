@@ -506,6 +506,10 @@ class HostCiRunner {
     // The tools.
     var dartVersion = await _readVersion(path, 'dart', ['--version']);
     run.dartVersion.v = dartVersion;
+    if (_cancelled) {
+      _cancelSteps(run);
+      return;
+    }
     if (dartVersion == null) {
       fail('dart not found');
       return;
@@ -518,6 +522,10 @@ class HostCiRunner {
       '--version',
     ]);
     run.runCiVersion.v = runCiVersion;
+    if (_cancelled) {
+      _cancelSteps(run);
+      return;
+    }
     if (runCiVersion == null) {
       fail(
         'run_ci not found, activate it: dart pub global activate dev_build '
@@ -682,6 +690,10 @@ class HostCiRunner {
       return null;
     }
     _process = process;
+    if (_cancelled) {
+      // Cancelled while it started.
+      _kill(process);
+    }
     try {
       // The package and command running now (the live caption), and the
       // first failure reported by run_ci.
@@ -849,12 +861,17 @@ class HostCiRunner {
         workingDirectory: path,
       );
       _process = process;
+      if (_cancelled) {
+        _kill(process);
+      }
       var out = <String>[];
       var outDone = process.stdoutLines.listen(out.add).asFuture<void>();
       var errDone = process.stderrLines.listen(out.add).asFuture<void>();
       var exitCode = await process.exitCode;
       await _awaitOutput(outDone, errDone);
       _process = null;
+      _killTimer?.cancel();
+      _killTimer = null;
       if (exitCode != 0) {
         for (var line in out) {
           _addLine(line, isError: true);
@@ -898,14 +915,20 @@ class HostCiRunner {
     _cancelled = true;
     var process = _process;
     if (process != null) {
-      process.kill();
-      // Still there after a while: no mercy.
-      _killTimer = Timer(killTimeout, () {
-        if (_process == process) {
-          process.kill(force: true);
-        }
-      });
+      _kill(process);
     }
+  }
+
+  /// Kill [process] (the current one), for good after [killTimeout].
+  void _kill(HostCiProcess process) {
+    process.kill();
+    // Still there after a while: no mercy.
+    _killTimer?.cancel();
+    _killTimer = Timer(killTimeout, () {
+      if (_process == process) {
+        process.kill(force: true);
+      }
+    });
   }
 
   /// `<id segments>/<key>.log`, the id segments made file name safe.

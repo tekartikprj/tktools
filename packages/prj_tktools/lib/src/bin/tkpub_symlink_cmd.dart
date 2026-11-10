@@ -71,11 +71,19 @@ tkpub symlink giturl1 [giturl2]
       var absoluteLinkPath = normalize(absolute(join(path, dependencyPath)));
       stdout.writeln('${package.id} $dependencyPath');
 
+      // Only an existing link is replaced: a folder there is a real one (the
+      // package itself when run from the git top), never deleted.
       var link = Link(absoluteLinkPath);
-      try {
-        link.deleteSync(recursive: true);
-      } catch (_) {}
-      Link(absoluteLinkPath).createSync(dependencyLocalPath, recursive: true);
+      if (FileSystemEntity.isLinkSync(absoluteLinkPath)) {
+        link.deleteSync();
+      } else if (FileSystemEntity.typeSync(absoluteLinkPath) !=
+          FileSystemEntityType.notFound) {
+        throw StateError(
+          '$absoluteLinkPath exists and is not a link, not replaced '
+          '(run from the git top?)',
+        );
+      }
+      link.createSync(dependencyLocalPath, recursive: true);
     }
 
     return true;

@@ -139,7 +139,9 @@ const _createIgnoredDirs = {'.dart_tool', 'build', '.git'};
 /// `flutter create` adds to an existing project (`lib/main.dart`,
 /// `test/widget_test.dart`, `.metadata`, `.gitignore`, `README.md`,
 /// `analysis_options.yaml`, `pubspec.lock`, `.idea/`, `<name>.iml`) is
-/// deleted.
+/// deleted, also when `flutter create` fails; an existing `.metadata` (that
+/// `flutter create` rewrites) is put back as it was. A file another process
+/// creates in the project meanwhile is deleted too.
 ///
 /// Returns the platforms created, empty when none was missing. [shell] runs
 /// `flutter create` (verbose by default) in [projectPath], whatever its
@@ -160,29 +162,41 @@ Future<List<String>> flutterCreatePlatforms(
   }
   var before = _createWatchedPaths(projectPath);
   var pubspec = await pathGetPubspecYamlMap(projectPath);
+  // flutter create rewrites an existing .metadata (revision, migration).
+  var metadataFile = File(p.join(projectPath, '.metadata'));
+  var metadata = metadataFile.existsSync()
+      ? metadataFile.readAsBytesSync()
+      : null;
   // Absolute: cd of a relative path is relative to the shell's folder.
   shell = (shell ?? Shell()).cd(p.absolute(projectPath));
-  await shell.run(
-    flutterCreatePlatformsCommandLine(
-      missing,
-      projectName: pubspecYamlGetPackageName(pubspec),
-      template: template,
-    ),
-  );
-  var created = _createWatchedPaths(
-    projectPath,
-  ).where((path) => !before.contains(path)).toList();
-  // Files first, then the folders, deepest first.
-  created.sort((a, b) => b.length.compareTo(a.length));
-  for (var path in created) {
-    var absolute = p.join(projectPath, path);
-    if (FileSystemEntity.isDirectorySync(absolute)) {
-      var dir = Directory(absolute);
-      if (dir.existsSync() && dir.listSync().isEmpty) {
-        dir.deleteSync();
+  try {
+    await shell.run(
+      flutterCreatePlatformsCommandLine(
+        missing,
+        projectName: pubspecYamlGetPackageName(pubspec),
+        template: template,
+      ),
+    );
+  } finally {
+    // Even when flutter create failed half way.
+    var created = _createWatchedPaths(
+      projectPath,
+    ).where((path) => !before.contains(path)).toList();
+    // Files first, then the folders, deepest first.
+    created.sort((a, b) => b.length.compareTo(a.length));
+    for (var path in created) {
+      var absolute = p.join(projectPath, path);
+      if (FileSystemEntity.isDirectorySync(absolute)) {
+        var dir = Directory(absolute);
+        if (dir.existsSync() && dir.listSync().isEmpty) {
+          dir.deleteSync();
+        }
+      } else {
+        File(absolute).deleteSync();
       }
-    } else {
-      File(absolute).deleteSync();
+    }
+    if (metadata != null) {
+      metadataFile.writeAsBytesSync(metadata);
     }
   }
   return missing;
@@ -190,12 +204,21 @@ Future<List<String>> flutterCreatePlatforms(
 
 /// The files and folders of the project at [projectPath] (relative paths)
 /// that `flutter create` may add, outside its platform folders.
+///
+/// A top folder that is a link (`test` linked to a shared folder) is listed
+/// too, `flutter create` writes through it; the links below are not
+/// followed.
 Set<String> _createWatchedPaths(String projectPath) {
   var paths = <String>{};
   void list(Directory dir, {required bool top}) {
     for (var entity in dir.listSync(followLinks: false)) {
       var path = p.relative(entity.path, from: projectPath);
-      if (entity is Directory) {
+      var isDir =
+          entity is Directory ||
+          (top &&
+              entity is Link &&
+              FileSystemEntity.isDirectorySync(entity.path));
+      if (isDir) {
         var name = p.basename(path);
         if (top &&
             (flutterProjectPlatforms.contains(name) ||
@@ -203,7 +226,7 @@ Set<String> _createWatchedPaths(String projectPath) {
           continue;
         }
         paths.add(path);
-        list(entity, top: false);
+        list(Directory(entity.path), top: false);
       } else {
         paths.add(path);
       }
